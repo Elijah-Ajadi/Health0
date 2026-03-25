@@ -76,6 +76,25 @@ class LoginView(views.APIView):
             })
         return response.Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
+class PasswordResetView(views.APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        nin = request.data.get('nin')
+        new_password = request.data.get('password')
+        
+        if not nin or not new_password:
+            return response.Response({'error': 'NIN and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            profile = PatientProfile.objects.get(nin=nin)
+            user = profile.user
+            user.set_password(new_password)
+            user.save()
+            return response.Response({'success': 'Password reset successful. You can now login.'})
+        except PatientProfile.DoesNotExist:
+            return response.Response({'error': 'NIN not found in our medical database.'}, status=status.HTTP_404_NOT_FOUND)
+
 class ProfileView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -91,16 +110,46 @@ class ProfileView(views.APIView):
 
     def patch(self, request):
         user = request.user
+        data = request.data.copy()
+        
+        # 1. Update User fields
+        user_fields = ['first_name', 'last_name', 'email']
+        user_updated = False
+        for field in user_fields:
+            if field in data:
+                setattr(user, field, data.get(field))
+                user_updated = True
+                # Remove from data to avoid serializer errors in next step
+                data.pop(field)
+        
+        if user_updated:
+            user.save()
+
+        # 2. Robust Date Parsing for DOB
+        if 'dob' in data and data['dob']:
+            from django.utils.dateparse import parse_date
+            try:
+                # Try parsing the date string using Django's built-in parser
+                parsed_dob = parse_date(data['dob'])
+                if parsed_dob:
+                    data['dob'] = parsed_dob.strftime('%Y-%m-%d')
+            except (ValueError, TypeError):
+                print(f"DEBUG: Failed to parse DOB with Django parser: {data['dob']}")
+                pass
+
+        # 3. Update Profile fields
         if user.role == User.Role.PATIENT:
             profile = PatientProfile.objects.get(user=user)
-            serializer = PatientProfileSerializer(profile, data=request.data, partial=True)
+            serializer = PatientProfileSerializer(profile, data=data, partial=True)
         else:
             profile = HospitalProfile.objects.get(user=user)
-            serializer = HospitalProfileSerializer(profile, data=request.data, partial=True)
+            serializer = HospitalProfileSerializer(profile, data=data, partial=True)
         
         if serializer.is_valid():
             serializer.save()
             return response.Response(serializer.data)
+        
+        print(f"DEBUG: Profile Serializer Errors: {serializer.errors}")
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 from .services.interswitch import InterswitchService

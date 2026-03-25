@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
                     storedUser = await SecureStore.getItemAsync('auth_user');
                 }
 
-                if (storedToken && storedUser) {
+                if (storedToken && storedUser && storedToken !== 'null' && storedToken !== 'undefined') {
                     setToken(storedToken);
                     setUser(JSON.parse(storedUser));
                 }

@@ -9,6 +9,7 @@ import { Theme } from './src/theme/Theme';
 
 // Patient Screens
 import PatientDashboard from './src/screens/PatientDashboard';
+import ProfileScreen from './src/screens/ProfileScreen';
 import VaultScreen from './src/screens/VaultScreen';
 import SharingScreen from './src/screens/SharingScreen';
 import PrivacyScreen from './src/screens/PrivacyScreen';
@@ -141,6 +142,7 @@ function Navigation() {
               <Stack.Screen name="HospitalTabs" component={HospitalNavigator} />
             )
           )}
+          <Stack.Screen name="Profile" component={ProfileScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
