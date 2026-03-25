@@ -1,0 +1,46 @@
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Python Virtual Environments
+venv/
+env/
+medv/
+.venv/
+.env/
+.env
+
+# React Native / Expo
+node_modules/
+.expo/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+web-build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Antigravity / Brain
+.gemini/
+.agents/
+brain/
+*.webp
+*.png
+*.mp4
