@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView, Modal, Pressable, Linking } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { PageWrapper } from '../components/PageWrapper';
 import { Theme } from '../theme/Theme';
@@ -315,6 +315,22 @@ export default function PatientDashboard({ navigation }) {
                         <MaterialIcons name="person-outline" size={22} color={Theme.colors.primary} />
                         <Text style={styles.menuItemText}>Edit Profile</Text>
                     </TouchableOpacity>
+
+                    {(user?.role === 'ADMIN' || user?.is_staff_admin || user?.is_superuser) && (
+                        <>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setShowProfileMenu(false);
+                                    Linking.openURL('http://localhost:5173/');
+                                }}
+                            >
+                                <MaterialCommunityIcons name="view-dashboard-variant" size={22} color={Theme.colors.secondary} />
+                                <Text style={[styles.menuItemText, { color: Theme.colors.secondary }]}>Admin Dashboard</Text>
+                            </TouchableOpacity>
+                            <View style={styles.menuDivider} />
+                        </>
+                    )}
 
                     <TouchableOpacity style={styles.menuItem}>
                         <MaterialIcons name="settings" size={22} color={Theme.colors.textSecondary} />

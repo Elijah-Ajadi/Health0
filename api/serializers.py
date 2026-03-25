@@ -7,7 +7,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'password', 'role', 'first_name', 'last_name', 'patient_profile')
+        fields = ('id', 'username', 'email', 'password', 'role', 'first_name', 'last_name', 'patient_profile', 'is_superuser', 'is_staff_admin')
 
     def get_patient_profile(self, obj):
         try:
