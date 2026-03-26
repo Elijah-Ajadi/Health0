@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, KeyboardAvoidingView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, KeyboardAvoidingView, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,13 +12,23 @@ export default function LoginScreen({ navigation }) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    // Reset Password States
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [resetNin, setResetNin] = useState('');
+    const [resetNewPassword, setResetNewPassword] = useState('');
+    const [resetLoading, setResetLoading] = useState(false);
 
     const handleLogin = async () => {
         if (!identifier || !password) {
-            Alert.alert("Missing Fields", "Please enter both identifier and password.");
+            setError("Please enter both identifier and password.");
             return;
         }
 
+        setError('');
+        setLoading(true);
         try {
             const response = await fetch(`${Config.BASE_URL}/api/login/`, {
                 method: 'POST',
@@ -26,7 +36,7 @@ export default function LoginScreen({ navigation }) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    username: identifier, // Backend uses username (could be NIN/Email)
+                    username: identifier,
                     password: password,
                 }),
             });
@@ -35,13 +45,49 @@ export default function LoginScreen({ navigation }) {
 
             if (response.ok) {
                 await login(result.user, result.token);
-                Alert.alert("Access Granted", "Welcome to your Secure Health Vault.");
                 navigation.navigate('PatientTabs');
             } else {
-                Alert.alert("Login Failed", result.error || "Invalid credentials.");
+                setError(result.error || "Invalid credentials. Please try again.");
             }
         } catch (error) {
-            Alert.alert("Network Error", "Could not connect to health0 gateway.");
+            setError("Network Error: Could not connect to health0 gateway.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetNin || !resetNewPassword) {
+            Alert.alert("Error", "Please fill in both NIN and New Password");
+            return;
+        }
+
+        setResetLoading(true);
+        try {
+            const response = await fetch(`${Config.BASE_URL}/api/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    nin: resetNin,
+                    password: resetNewPassword,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                Alert.alert("Success", "Password reset successful! You can now login.");
+                setShowResetModal(false);
+                setIdentifier(resetNin);
+            } else {
+                Alert.alert("Error", result.error || "Reset failed. Please verify your NIN.");
+            }
+        } catch (err) {
+            Alert.alert("Network Error", "Could not reach reset server.");
+        } finally {
+            setResetLoading(false);
         }
     };
 
@@ -105,18 +151,30 @@ export default function LoginScreen({ navigation }) {
                             />
                             <Text style={styles.checkboxText}>Remember this device</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowResetModal(true)}>
                             <Text style={styles.forgotText}>Forgot Password?</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
+                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                    <TouchableOpacity
+                        style={[styles.loginBtn, loading && { opacity: 0.7 }]}
+                        onPress={handleLogin}
+                        disabled={loading}
+                    >
                         <LinearGradient
                             colors={Theme.gradients.medical}
                             style={styles.gradientBtn}
                         >
-                            <Text style={styles.loginBtnText}>SIGN IN TO SECURE VAULT</Text>
-                            <MaterialIcons name="arrow-forward" size={20} color="white" />
+                            {loading ? (
+                                <ActivityIndicator color="white" />
+                            ) : (
+                                <>
+                                    <Text style={styles.loginBtnText}>SIGN IN TO SECURE VAULT</Text>
+                                    <MaterialIcons name="arrow-forward" size={20} color="white" />
+                                </>
+                            )}
                         </LinearGradient>
                     </TouchableOpacity>
 
@@ -131,6 +189,58 @@ export default function LoginScreen({ navigation }) {
                         <Text style={styles.biometricText}>Login with Biometrics</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Password Reset Modal */}
+                <Modal
+                    visible={showResetModal}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowResetModal(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.resetModal}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Reset Secure Access</Text>
+                                <TouchableOpacity onPress={() => setShowResetModal(false)}>
+                                    <MaterialIcons name="close" size={24} color={Theme.colors.textSecondary} />
+                                </TouchableOpacity>
+                            </View>
+                            <Text style={styles.modalSub}>Enter your verified NIN to establish a new clinical password.</Text>
+
+                            <View style={styles.modalInputGroup}>
+                                <Text style={styles.modalLabel}>NATIONAL IDENTITY NUMBER (NIN)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Enter your 11-digit NIN"
+                                    value={resetNin}
+                                    onChangeText={setResetNin}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+
+                            <View style={styles.modalInputGroup}>
+                                <Text style={styles.modalLabel}>NEW SECURE PASSWORD</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Enter new password"
+                                    value={resetNewPassword}
+                                    onChangeText={setResetNewPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.resetSubmitBtn}
+                                onPress={handleResetPassword}
+                                disabled={resetLoading}
+                            >
+                                <Text style={styles.resetSubmitText}>
+                                    {resetLoading ? 'RESETTING...' : 'RESET PASSWORD'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>Don't have a secure Health0 ID?</Text>
@@ -228,10 +338,78 @@ const styles = StyleSheet.create({
         color: Theme.colors.textSecondary,
         fontWeight: '500',
     },
+    errorText: {
+        color: Theme.colors.error,
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
     forgotText: {
         fontSize: 13,
         color: Theme.colors.secondary,
         fontWeight: '700',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    resetModal: {
+        backgroundColor: 'white',
+        borderRadius: 24,
+        padding: 24,
+        ...Theme.shadows.lg,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: Theme.colors.text,
+    },
+    modalSub: {
+        fontSize: 14,
+        color: Theme.colors.textSecondary,
+        marginBottom: 24,
+        lineHeight: 20,
+    },
+    modalInputGroup: {
+        marginBottom: 16,
+    },
+    modalLabel: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: Theme.colors.textSecondary,
+        marginBottom: 8,
+    },
+    modalInput: {
+        height: 50,
+        backgroundColor: Theme.colors.background,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: Theme.colors.outline,
+        fontSize: 15,
+    },
+    resetSubmitBtn: {
+        backgroundColor: Theme.colors.primary,
+        height: 54,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 8,
+    },
+    resetSubmitText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: '800',
+        letterSpacing: 1,
     },
     loginBtn: {
         borderRadius: Theme.borderRadius.lg,

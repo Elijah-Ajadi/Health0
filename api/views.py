@@ -3,6 +3,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from .models import User, PatientProfile, HospitalProfile
 from .serializers import UserSerializer, PatientProfileSerializer, HospitalProfileSerializer
+from .utils import log_audit, check_security_breach
 
 from django.db import IntegrityError, transaction
 
@@ -60,21 +61,57 @@ class LoginView(views.APIView):
         # Try direct authentication first (Username)
         user = authenticate(username=identifier, password=password)
         
-        # If failed, try finding by NIN
+        # If failed, try finding by Email or NIN
         if not user:
+            # 1. Try by Email
             try:
-                profile = PatientProfile.objects.get(nin=identifier)
-                user = authenticate(username=profile.user.username, password=password)
-            except PatientProfile.DoesNotExist:
-                pass
+                user_obj = User.objects.get(email=identifier)
+                user = authenticate(username=user_obj.username, password=password)
+            except User.DoesNotExist:
+                # 2. Try by NIN (Patient)
+                try:
+                    profile = PatientProfile.objects.get(nin=identifier)
+                    user = authenticate(username=profile.user.username, password=password)
+                except PatientProfile.DoesNotExist:
+                    pass
                 
         if user:
+            # Status Check for Hospitals
+            if user.role == User.Role.HOSPITAL:
+                try:
+                    if user.hospital_profile.status != HospitalProfile.Status.ACTIVE:
+                        msg = "Your account is currently under review. 24-48 hours vetting duration."
+                        if user.hospital_profile.status == HospitalProfile.Status.DEACTIVATED:
+                            msg = f"Your application was not approved. Reason: {user.hospital_profile.rejection_reason}"
+                        return response.Response({'error': msg}, status=status.HTTP_403_FORBIDDEN)
+                except HospitalProfile.DoesNotExist:
+                    pass
+
             token, created = Token.objects.get_or_create(user=user)
             return response.Response({
                 'token': token.key,
                 'user': UserSerializer(user).data
             })
         return response.Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+class PasswordResetView(views.APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        nin = request.data.get('nin')
+        new_password = request.data.get('password')
+        
+        if not nin or not new_password:
+            return response.Response({'error': 'NIN and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            profile = PatientProfile.objects.get(nin=nin)
+            user = profile.user
+            user.set_password(new_password)
+            user.save()
+            return response.Response({'success': 'Password reset successful. You can now login.'})
+        except PatientProfile.DoesNotExist:
+            return response.Response({'error': 'NIN not found in our medical database.'}, status=status.HTTP_404_NOT_FOUND)
 
 class ProfileView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -91,16 +128,46 @@ class ProfileView(views.APIView):
 
     def patch(self, request):
         user = request.user
+        data = request.data.copy()
+        
+        # 1. Update User fields
+        user_fields = ['first_name', 'last_name', 'email']
+        user_updated = False
+        for field in user_fields:
+            if field in data:
+                setattr(user, field, data.get(field))
+                user_updated = True
+                # Remove from data to avoid serializer errors in next step
+                data.pop(field)
+        
+        if user_updated:
+            user.save()
+
+        # 2. Robust Date Parsing for DOB
+        if 'dob' in data and data['dob']:
+            from django.utils.dateparse import parse_date
+            try:
+                # Try parsing the date string using Django's built-in parser
+                parsed_dob = parse_date(data['dob'])
+                if parsed_dob:
+                    data['dob'] = parsed_dob.strftime('%Y-%m-%d')
+            except (ValueError, TypeError):
+                print(f"DEBUG: Failed to parse DOB with Django parser: {data['dob']}")
+                pass
+
+        # 3. Update Profile fields
         if user.role == User.Role.PATIENT:
             profile = PatientProfile.objects.get(user=user)
-            serializer = PatientProfileSerializer(profile, data=request.data, partial=True)
+            serializer = PatientProfileSerializer(profile, data=data, partial=True)
         else:
             profile = HospitalProfile.objects.get(user=user)
-            serializer = HospitalProfileSerializer(profile, data=request.data, partial=True)
+            serializer = HospitalProfileSerializer(profile, data=data, partial=True)
         
         if serializer.is_valid():
             serializer.save()
             return response.Response(serializer.data)
+        
+        print(f"DEBUG: Profile Serializer Errors: {serializer.errors}")
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 from .services.interswitch import InterswitchService
@@ -113,7 +180,21 @@ class VerifyNINView(views.APIView):
         if not nin:
             return response.Response({'error': 'NIN is required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Security Check
+        ip = request.META.get('REMOTE_ADDR')
+        check_security_breach(request.user if request.user.is_authenticated else None, ip)
+
         result = InterswitchService.verify_nin(nin)
+        
+        # Log the verification attempt
+        from .models import IdentityVerificationLog
+        IdentityVerificationLog.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            nin_queried=nin,
+            status='SUCCESS' if result.get('status') == 'success' else 'FAILURE',
+            error_message=result.get('message', ''),
+            ip_address=ip
+        )
         
         if result.get('status') == 'success':
             return response.Response(result['data'])
@@ -177,6 +258,16 @@ class HospitalPatientDetailView(views.APIView):
             records = HealthRecord.objects.filter(patient=patient)
             patient_serializer = PatientProfileSerializer(patient)
             records_serializer = HealthRecordSerializer(records, many=True)
+            # Log Audit Trail
+            log_audit(
+                actor=request.user,
+                action='VIEW_PATIENT_RECORDS',
+                patient=patient,
+                resource_type='PatientProfile',
+                resource_id=patient.id,
+                ip_address=request.META.get('REMOTE_ADDR')
+            )
+
             return response.Response({
                 'patient': patient_serializer.data,
                 'records': records_serializer.data

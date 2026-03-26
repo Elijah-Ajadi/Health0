@@ -1,12 +1,15 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PageWrapper } from '../../components/PageWrapper';
 import { Theme } from '../../theme/Theme';
+import { useAuth } from '../../context/AuthContext';
 
-export default function ClinicalDashboard() {
+export default function ClinicalDashboard({ navigation }) {
+    const { user, logout } = useAuth();
     const { width } = useWindowDimensions();
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
     const isWeb = width > 768;
 
     const MetricCard = ({ label, value, icon, color }) => (
@@ -39,6 +42,56 @@ export default function ClinicalDashboard() {
         </TouchableOpacity>
     );
 
+    const renderProfileMenu = () => (
+        <Modal
+            transparent={true}
+            visible={showProfileMenu}
+            onRequestClose={() => setShowProfileMenu(false)}
+            animationType="fade"
+        >
+            <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setShowProfileMenu(false)}
+            >
+                <View style={[styles.profileMenu, isWeb && styles.webProfileMenu]}>
+                    <View style={styles.menuHeader}>
+                        <Text style={styles.menuUserName}>{user?.first_name} {user?.last_name}</Text>
+                        <Text style={styles.menuUserEmail}>{user?.email}</Text>
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            setShowProfileMenu(false);
+                            navigation.navigate('Profile');
+                        }}
+                    >
+                        <MaterialIcons name="person-outline" size={22} color={Theme.colors.clinical.primary} />
+                        <Text style={styles.menuItemText}>Edit Profile</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <MaterialIcons name="settings" size={22} color={Theme.colors.textSecondary} />
+                        <Text style={styles.menuItemText}>Account Settings</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            setShowProfileMenu(false);
+                            logout();
+                        }}
+                    >
+                        <MaterialIcons name="logout" size={22} color={Theme.colors.error} />
+                        <Text style={[styles.menuItemText, { color: Theme.colors.error }]}>Logout</Text>
+                    </TouchableOpacity>
+                </View>
+            </Pressable>
+        </Modal>
+    );
+
     return (
         <PageWrapper
             header={
@@ -50,9 +103,14 @@ export default function ClinicalDashboard() {
                         </View>
                     </View>
                     <View style={styles.headerRight}>
-                        <TouchableOpacity style={styles.statusToggle}>
+                        <TouchableOpacity
+                            style={styles.statusToggle}
+                            onPress={() => setShowProfileMenu(true)}
+                        >
                             <View style={styles.onlineDot} />
-                            <Text style={styles.statusLabel}>DR. ADEMOLA (ON DUTY)</Text>
+                            <Text style={styles.statusLabel}>
+                                {user?.first_name ? `DR. ${user.first_name.toUpperCase()} (ON DUTY)` : 'DR. ADEMOLA (OFFLINE)'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -98,7 +156,7 @@ export default function ClinicalDashboard() {
                     <View style={styles.alertList}>
                         <AlertItem
                             type="Abnormal Labs"
-                            message="Patient HV-092 (Olawale B.): High Glucose"
+                            message="Patient ID: #882 has critical high glucose."
                             time="2m ago"
                             severity="high"
                         />
@@ -109,8 +167,8 @@ export default function ClinicalDashboard() {
                             severity="low"
                         />
                         <AlertItem
-                            type="Medication Refill"
-                            message="Patient HV-118: Hypertension Meds Overdue"
+                            type="Medication Overdue"
+                            message="Ward 4 - Bed 12 medication needs administration."
                             time="1h ago"
                             severity="high"
                         />
@@ -301,8 +359,58 @@ const styles = StyleSheet.create({
     },
     alertTime: {
         fontSize: 10,
-        fontWeight: '600',
+        fontFamily: Theme.typography.fontFamilyMedium,
         color: Theme.colors.textSecondary,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-end',
+        paddingTop: Platform.OS === 'web' ? 70 : 100,
+        paddingRight: 20,
+    },
+    profileMenu: {
+        width: 250,
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 10,
+        ...Theme.shadows.lg,
+    },
+    webProfileMenu: {
+        marginTop: 10,
+    },
+    menuHeader: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: Theme.colors.outline,
+    },
+    menuUserName: {
+        fontSize: 16,
+        fontFamily: Theme.typography.fontFamilyBold,
+        color: Theme.colors.text,
+    },
+    menuUserEmail: {
+        fontSize: 12,
+        fontFamily: Theme.typography.fontFamilyRegular,
+        color: Theme.colors.textSecondary,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+    },
+    menuItemText: {
+        fontSize: 14,
+        fontFamily: Theme.typography.fontFamilyMedium,
+        color: Theme.colors.text,
+        marginLeft: 10,
+    },
+    menuDivider: {
+        height: 1,
+        backgroundColor: Theme.colors.outline,
+        marginVertical: 5,
     },
     complianceCard: {
         backgroundColor: '#f0fdf4',

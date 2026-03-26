@@ -76,5 +76,10 @@ export const Theme = {
                 elevation: 10,
             }
         }),
+    },
+    typography: {
+        fontFamilyRegular: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontFamilyMedium: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
+        fontFamilyBold: Platform.OS === 'ios' ? 'System' : 'sans-serif-condensed',
     }
 };

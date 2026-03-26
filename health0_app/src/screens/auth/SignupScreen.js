@@ -30,8 +30,8 @@ export default function SignupScreen({ navigation }) {
     const [isNINVerified, setIsNINVerified] = useState(false);
 
     const handleVerifyNIN = async () => {
-        if (formData.nin.length !== 11) {
-            Alert.alert("Invalid NIN", "NIN must be 11 digits.");
+        if (formData.nin.length < 11) {
+            Alert.alert("Invalid VNIN/NIM", "Please enter a valid NIN or VNIN.");
             return;
         }
         setIsVerifyingNIN(true);
@@ -51,6 +51,7 @@ export default function SignupScreen({ navigation }) {
                 // Map official Interswitch Full Details schema
                 setFormData({
                     ...formData,
+                    nin: result.nin || formData.nin,
                     fullName: `${result.firstName || ''} ${result.middleName || ''} ${result.lastName || ''}`.trim(),
                     dob: result.dateOfBirth,
                     gender: result.gender === 'f' ? 'Female' : result.gender === 'm' ? 'Male' : result.gender,
@@ -81,11 +82,10 @@ export default function SignupScreen({ navigation }) {
                     <MaterialCommunityIcons name="card-account-details-outline" size={20} color={Theme.colors.textSecondary} style={styles.inputIcon} />
                     <TextInput
                         style={styles.input}
-                        placeholder="11-digit NIN"
+                        placeholder="VNIN (e.g. YV...FY) or NIN"
                         value={formData.nin}
-                        onChangeText={(txt) => setFormData({ ...formData, nin: txt.replace(/[^0-9]/g, '') })}
-                        keyboardType="numeric"
-                        maxLength={11}
+                        onChangeText={(txt) => setFormData({ ...formData, nin: txt.toUpperCase() })}
+                        maxLength={20}
                     />
                     {isNINVerified && <MaterialIcons name="check-circle" size={20} color={Theme.colors.success} />}
                 </View>
@@ -113,6 +113,10 @@ export default function SignupScreen({ navigation }) {
                 </TouchableOpacity>
             ) : (
                 <View style={styles.verifiedData}>
+                    <View style={styles.readOnlyField}>
+                        <Text style={styles.readOnlyLabel}>PRIMARY NIN (VERIFIED)</Text>
+                        <Text style={styles.readOnlyValue}>{formData.nin}</Text>
+                    </View>
                     <View style={styles.readOnlyField}>
                         <Text style={styles.readOnlyLabel}>FULL NAME (LEGAL)</Text>
                         <Text style={styles.readOnlyValue}>{formData.fullName}</Text>
@@ -206,6 +210,12 @@ export default function SignupScreen({ navigation }) {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
 
+            console.log("DEBUG: Sending Signup Payload:", {
+                username: formData.username || formData.email,
+                email: formData.email,
+                nin: formData.nin,
+                phone_number: formData.phone
+            });
             const response = await fetch(`${Config.BASE_URL}/api/register/`, {
                 method: 'POST',
                 headers: {

@@ -1,13 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView, Modal, Pressable, Linking } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { PageWrapper } from '../components/PageWrapper';
 import { Theme } from '../theme/Theme';
 import { useAuth } from '../context/AuthContext';
 
-export default function PatientDashboard() {
-    const { user } = useAuth();
+export default function PatientDashboard({ navigation }) {
+    const { user, logout } = useAuth();
     const { width } = useWindowDimensions();
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
     const isWeb = width > 768;
 
     // --- Sub-Components ---
@@ -25,10 +26,15 @@ export default function PatientDashboard() {
                     <MaterialIcons name="notifications-none" size={24} color={Theme.colors.textSecondary} />
                     <View style={styles.notifDot} />
                 </TouchableOpacity>
-                <Image
-                    source={{ uri: 'https://i.pravatar.cc/150?u=health0_patient' }}
-                    style={styles.profileThumbnail}
-                />
+                <TouchableOpacity
+                    style={styles.profileBtn}
+                    onPress={() => setShowProfileMenu(true)}
+                >
+                    <Image
+                        source={{ uri: 'https://i.pravatar.cc/150?u=health0_patient' }}
+                        style={styles.profileThumbnail}
+                    />
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -278,8 +284,74 @@ export default function PatientDashboard() {
             <TouchableOpacity style={styles.navTab}><MaterialIcons name="dashboard" size={24} color={Theme.colors.primary} /></TouchableOpacity>
             <TouchableOpacity style={styles.navTab}><MaterialIcons name="folder" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
             <TouchableOpacity style={styles.navTab}><MaterialIcons name="analytics" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
-            <TouchableOpacity style={styles.navTab}><MaterialIcons name="person" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
+            <TouchableOpacity style={styles.navTab} onPress={() => navigation.navigate('Profile')}><MaterialIcons name="person" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
         </View>
+    );
+
+    const renderProfileMenu = () => (
+        <Modal
+            transparent={true}
+            visible={showProfileMenu}
+            onRequestClose={() => setShowProfileMenu(false)}
+            animationType="fade"
+        >
+            <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setShowProfileMenu(false)}
+            >
+                <View style={[styles.profileMenu, isWeb && styles.webProfileMenu]}>
+                    <View style={styles.menuHeader}>
+                        <Text style={styles.menuUserName}>{user?.first_name} {user?.last_name}</Text>
+                        <Text style={styles.menuUserEmail}>{user?.email}</Text>
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            setShowProfileMenu(false);
+                            navigation.navigate('Profile');
+                        }}
+                    >
+                        <MaterialIcons name="person-outline" size={22} color={Theme.colors.primary} />
+                        <Text style={styles.menuItemText}>Edit Profile</Text>
+                    </TouchableOpacity>
+
+                    {(user?.role === 'ADMIN' || user?.is_staff_admin || user?.is_superuser) && (
+                        <>
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    setShowProfileMenu(false);
+                                    Linking.openURL('http://localhost:5173/');
+                                }}
+                            >
+                                <MaterialCommunityIcons name="view-dashboard-variant" size={22} color={Theme.colors.secondary} />
+                                <Text style={[styles.menuItemText, { color: Theme.colors.secondary }]}>Admin Dashboard</Text>
+                            </TouchableOpacity>
+                            <View style={styles.menuDivider} />
+                        </>
+                    )}
+
+                    <TouchableOpacity style={styles.menuItem}>
+                        <MaterialIcons name="settings" size={22} color={Theme.colors.textSecondary} />
+                        <Text style={styles.menuItemText}>Account Settings</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.menuDivider} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            setShowProfileMenu(false);
+                            logout();
+                        }}
+                    >
+                        <MaterialIcons name="logout" size={22} color={Theme.colors.error} />
+                        <Text style={[styles.menuItemText, { color: Theme.colors.error }]}>Logout</Text>
+                    </TouchableOpacity>
+                </View>
+            </Pressable>
+        </Modal>
     );
 
     // --- Main Layout ---
@@ -302,6 +374,8 @@ export default function PatientDashboard() {
             <TouchableOpacity style={styles.fab}>
                 <MaterialIcons name="add-a-photo" size={28} color="white" />
             </TouchableOpacity>
+
+            {renderProfileMenu()}
         </PageWrapper>
     );
 }
@@ -385,6 +459,70 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         borderWidth: 2,
         borderColor: 'white',
+    },
+
+    profileBtn: {
+        padding: 2,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'flex-start',
+        alignItems: 'flex-end',
+        paddingTop: Platform.OS === 'web' ? 70 : 64,
+        paddingRight: 20,
+    },
+    profileMenu: {
+        width: 250,
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 8,
+        elevation: 10,
+        ...Platform.select({
+            web: { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+            default: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 10,
+            }
+        })
+    },
+    webProfileMenu: {
+        width: 280,
+    },
+    menuHeader: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Theme.colors.outline,
+        marginBottom: 8,
+    },
+    menuUserName: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: Theme.colors.text,
+    },
+    menuUserEmail: {
+        fontSize: 12,
+        color: Theme.colors.textSecondary,
+        marginTop: 2,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 8,
+        gap: 12,
+    },
+    menuItemText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Theme.colors.text,
+    },
+    menuDivider: {
+        height: 1,
+        backgroundColor: Theme.colors.outline,
+        marginVertical: 8,
     },
 
     // Identity Section Styles
