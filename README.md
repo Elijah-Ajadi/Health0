@@ -1,4 +1,4 @@
-# Health0 - Secure Health Identity & Clinical Suite
+./# Health0 - Secure Health Identity & Clinical Suite
 
 Health0 is a premium, high-density Electronic Medical Record (EMR) and Patient Identity platform. It leverages live **Interswitch NIN Verification** to ensure 100% identity accuracy and provides patients with a secure, digital vault for their medical history.
 

@@ -1,144 +1,198 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { ChevronLeft, CloudUpload, File, X, Info, CheckCircle } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Button, Input } from '../components/ui'
+import api from '../services/api'
 
 const RecordUpload = () => {
-  const navigate = useNavigate()
-  const [dragActive, setDragActive] = useState(false)
-  const [file, setFile] = useState(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
+    const navigate = useNavigate()
+    const [dragActive, setDragActive] = useState(false)
+    const [file, setFile] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [isSuccess, setIsSuccess] = useState(false)
+    const [formData, setFormData] = useState({
+        patient_nin: '',
+        category: 'Radiology Report',
+        description: ''
+    })
 
-  const handleDrag = (e) => {
-    e.preventDefault()
-    setDragActive(e.type === "dragenter" || e.type === "dragover")
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0])
+    const handleDrag = (e) => {
+        e.preventDefault()
+        setDragActive(e.type === "dragenter" || e.type === "dragover")
     }
-  }
 
-  const handleUpload = () => {
-    setIsUploading(true)
-    setTimeout(() => {
-      setIsUploading(false)
-      setIsSuccess(true)
-    }, 1500)
-  }
+    const handleDrop = (e) => {
+        e.preventDefault()
+        setDragActive(false)
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            setFile(e.dataTransfer.files[0])
+        }
+    }
 
-  if (isSuccess) {
+    const handleUpload = async () => {
+        setLoading(true)
+        const data = new FormData()
+        data.append('file', file)
+        data.append('patient_nin', formData.patient_nin)
+        data.append('category', formData.category)
+        data.append('description', formData.description)
+
+        try {
+            await api.post('/records/upload/', data)
+            setIsSuccess(true)
+        } catch (err) {
+            console.error('Upload failed:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (isSuccess) {
+        return (
+            <div className="flex items-center justify-center min-h-[70vh]">
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-md w-full text-center p-12 bg-surface-container-lowest rounded-[3rem] shadow-modal border border-outline-variant/10"
+                >
+                    <div className="bg-emerald-500 text-white w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-500/20">
+                        <span className="material-symbols-outlined text-5xl">task_alt</span>
+                    </div>
+                    <h2 className="text-3xl font-headline font-black text-on-surface uppercase italic mb-4">Ledger Updated</h2>
+                    <p className="text-on-surface-variant font-medium mb-12 leading-relaxed">
+                        The clinical record has been encrypted and securely synchronized with the patient's global health vault.
+                    </p>
+                    <div className="space-y-3">
+                        <button 
+                            onClick={() => { setIsSuccess(false); setFile(null); }}
+                            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                        >
+                            Upload Another Record
+                        </button>
+                        <button 
+                            onClick={() => navigate('/dashboard')}
+                            className="w-full py-4 text-on-surface-variant font-bold text-sm hover:underline"
+                        >
+                            Return to Portal
+                        </button>
+                    </div>
+                </motion.div>
+            </div>
+        )
+    }
+
     return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="text-center py-16 px-6"
-      >
-        <div className="bg-emerald-500 text-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-500/20">
-          <CheckCircle size={40} />
+        <div className="max-w-4xl mx-auto space-y-10">
+            {/* ─── HEADER ─── */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <button onClick={() => navigate(-1)} className="p-2 -ml-3 text-on-surface-variant hover:text-primary transition-colors">
+                            <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                        </button>
+                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] bg-primary/5 px-3 py-1 rounded-full border border-primary/10">Clinical Input</span>
+                    </div>
+                    <h1 className="text-4xl font-headline font-black text-on-surface tracking-tight italic uppercase">New <span className="text-primary italic">Health Record</span></h1>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                {/* ─── FORM (LEFT) ─── */}
+                <div className="lg:col-span-7 space-y-8">
+                    <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-subtle border border-outline-variant/10 space-y-6">
+                        <InputField 
+                            label="Target Patient NIN (11 Digits)" 
+                            placeholder="Search by identity number..." 
+                            value={formData.patient_nin}
+                            onChange={(e) => setFormData({...formData, patient_nin: e.target.value.replace(/\D/g, '').slice(0, 11)})}
+                        />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">Record Classification</label>
+                            <select 
+                                className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/40 outline-none transition-all"
+                                value={formData.category}
+                                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                            >
+                                <option>Radiology Report</option>
+                                <option>Blood Analysis</option>
+                                <option>Surgery Summary</option>
+                                <option>Vaccination Record</option>
+                                <option>General Consultation</option>
+                            </select>
+                        </div>
+                        <InputField 
+                            label="Clinical Observations / Description" 
+                            placeholder="Enter detailed report summary..." 
+                            isTextArea 
+                            rows={4}
+                            value={formData.description}
+                            onChange={(e) => setFormData({...formData, description: e.target.value})}
+                        />
+                    </div>
+                </div>
+
+                {/* ─── DROPZONE (RIGHT) ─── */}
+                <div className="lg:col-span-5 space-y-6">
+                    <label 
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                        className={`block h-full min-h-[300px] relative border-2 border-dashed rounded-[2.5rem] transition-all cursor-pointer group flex flex-col items-center justify-center p-10 text-center ${
+                            dragActive ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container-lowest hover:border-primary/40'
+                        }`}
+                    >
+                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => setFile(e.target.files[0])} />
+                        
+                        {!file ? (
+                            <>
+                                <div className="w-20 h-20 bg-primary/5 text-primary rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-inner">
+                                    <span className="material-symbols-outlined text-5xl">cloud_upload</span>
+                                </div>
+                                <h3 className="text-lg font-black text-on-surface uppercase italic mb-2">Drop Clinical File</h3>
+                                <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
+                                    Drag and drop PDFs or medical images (DICOM, JPG) up to 50MB.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
+                                    <span className="material-symbols-outlined text-5xl">description</span>
+                                </div>
+                                <h3 className="text-lg font-black text-on-surface uppercase italic mb-1 break-all px-4">{file.name}</h3>
+                                <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-4">Ready for Encryption</p>
+                                <button onClick={(e) => { e.preventDefault(); setFile(null); }} className="text-error font-black text-[10px] uppercase tracking-widest hover:underline">Remove File</button>
+                            </>
+                        )}
+                    </label>
+
+                    <button 
+                        onClick={handleUpload}
+                        disabled={!file || !formData.patient_nin || loading}
+                        className={`w-full py-5 rounded-2xl font-headline font-black text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 ${
+                            file && formData.patient_nin && !loading ? 'bg-gradient-to-r from-primary to-primary-container shadow-primary/30' : 'bg-surface-dim text-on-surface-variant cursor-not-allowed'
+                        }`}
+                    >
+                        {loading ? 'Encrypting Node...' : 'Synchronize Record'}
+                        <span className="material-symbols-outlined">{loading ? 'sync' : 'verified'}</span>
+                    </button>
+                    <p className="text-[10px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-60">
+                        AES-256 Multi-layer Encryption Active
+                    </p>
+                </div>
+            </div>
         </div>
-        <h2 className="text-2xl mb-3 font-bold">Successfully Verified!</h2>
-        <p className="text-slate-500 mb-12 leading-relaxed">
-          The health record has been encrypted and securely added to the patient's digital vault.
-        </p>
-        <div className="flex flex-col gap-3">
-          <Button variant="primary" onClick={() => { setIsSuccess(false); setFile(null); }}>
-            Upload Another
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            Done
-          </Button>
-        </div>
-      </motion.div>
     )
-  }
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col gap-6"
-    >
-      <header className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="p-2 aspect-square">
-          <ChevronLeft size={24} />
-        </Button>
-        <h2 className="text-xl m-0">New Health Record</h2>
-      </header>
-
-      <section className="space-y-4">
-        <Input label="Patient Hash / Identifier" placeholder="e.g. 0x74...3f" />
-        <div>
-          <label className="block mb-2 text-sm font-medium text-slate-500">Record Classification</label>
-          <select className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:border-primary focus:bg-white transition-all appearance-none cursor-pointer">
-            <option>Radiology Report</option>
-            <option>Blood Analysis</option>
-            <option>Surgery Summary</option>
-            <option>Vaccination Record</option>
-            <option>Other</option>
-          </select>
-        </div>
-      </section>
-
-      <section 
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        className={`bg-white rounded-2xl p-10 text-center border-2 border-dashed transition-all ${
-          dragActive ? 'border-primary bg-primary-light/30' : 'border-slate-100'
-        }`}
-      >
-        {!file ? (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-primary-light text-primary rounded-full flex items-center justify-center mb-4">
-              <CloudUpload size={32} />
-            </div>
-            <h4 className="text-lg font-bold text-slate-900 mb-1">Upload Laboratory Data</h4>
-            <p className="text-sm text-slate-500 mb-6">PDF, JPEG, DICOM or standard images</p>
-            <Button variant="outline" className="text-xs">Browse Documents</Button>
-          </div>
-        ) : (
-          <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-4 text-left border border-slate-200">
-            <div className="bg-primary text-white p-3 rounded-xl">
-              <File size={28} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-slate-900 truncate m-0">{file.name}</p>
-              <p className="text-xs text-slate-400 m-0 font-bold tracking-tight">{(file.size / 1024 / 1024).toFixed(2)} MB • READY</p>
-            </div>
-            <button onClick={() => setFile(null)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
-              <X size={20} />
-            </button>
-          </div>
-        )}
-      </section>
-
-      <div className="bg-amber-50 rounded-2xl p-4 flex gap-3 text-amber-800 text-sm border border-amber-100 shadow-sm shadow-amber-500/5">
-        <Info size={24} className="shrink-0 text-amber-600" />
-        <p className="m-0 leading-relaxed font-medium">All uploaded records are automatically encrypted. Private keys are never stored on central servers.</p>
-      </div>
-
-      <Button 
-        variant="primary" 
-        className="py-4 text-lg shadow-xl shadow-primary/20 mt-2" 
-        disabled={!file || isUploading}
-        onClick={handleUpload}
-      >
-        {isUploading ? (
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            Encrypting...
-          </div>
-        ) : 'Confirm & Send to Vault'}
-      </Button>
-    </motion.div>
-  )
 }
+
+const InputField = ({ label, placeholder, value, onChange, type = "text", isTextArea = false, rows = "3" }) => (
+    <div className="space-y-2">
+        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">{label}</label>
+        {isTextArea ? (
+            <textarea className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-outline/40 resize-none outline-none" rows={rows} placeholder={placeholder} value={value} onChange={onChange} />
+        ) : (
+            <input type={type} className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-outline/40 outline-none" placeholder={placeholder} value={value} onChange={onChange} />
+        )}
+    </div>
+)
 
 export default RecordUpload

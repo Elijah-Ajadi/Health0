@@ -10,11 +10,10 @@ const LandingPage = () => {
     const navigate = useNavigate()
 
     const handleLogin = (role) => {
-        localStorage.setItem('role', role)
         if (role === 'patient') {
-            navigate('/signup')
+            navigate('/patient/register')
         } else {
-            navigate('/dashboard')
+            navigate('/hospital/register')
         }
     }
 
