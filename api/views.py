@@ -1,8 +1,10 @@
-from rest_framework import status, views, response, permissions
+from rest_framework import status, views, response, permissions, generics, parsers
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
-from .models import User, PatientProfile, HospitalProfile
-from .serializers import UserSerializer, PatientProfileSerializer, HospitalProfileSerializer
+from django.db import models as db_models
+from django.utils.dateparse import parse_date
+from .models import User, PatientProfile, HospitalProfile, HealthRecord, Appointment
+from .serializers import UserSerializer, PatientProfileSerializer, HospitalProfileSerializer, AppointmentSerializer, HealthRecordSerializer
 from .utils import log_audit, check_security_breach
 
 from django.db import IntegrityError, transaction
@@ -206,6 +208,7 @@ class VerifyNINView(views.APIView):
 
 class HealthRecordView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     def get(self, request):
         if request.user.role == User.Role.PATIENT:
@@ -217,6 +220,8 @@ class HealthRecordView(views.APIView):
         return response.Response(serializer.data)
 
     def post(self, request):
+        print(f"DEBUG: Record Upload Request Data: {request.data}")
+        print(f"DEBUG: Record Upload Request FILES: {request.FILES}")
         serializer = HealthRecordSerializer(data=request.data)
         if serializer.is_valid():
             patient_profile = None
@@ -232,6 +237,8 @@ class HealthRecordView(views.APIView):
                 serializer.save(patient=patient_profile, uploaded_by=request.user)
                 return response.Response(serializer.data, status=status.HTTP_201_CREATED)
             return response.Response({'error': 'Patient Profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        print(f"DEBUG: Record Upload Validation Errors: {serializer.errors}")
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class HospitalPatientSearchView(views.APIView):
@@ -333,4 +340,16 @@ class AppointmentView(views.APIView):
                 serializer.save(hospital=hospital_profile)
             return response.Response(serializer.data, status=status.HTTP_201_CREATED)
         return response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from .models import AuditLog
+from .admin_serializers import AuditLogSerializer
+
+class PatientAuditLogView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AuditLogSerializer
+
+    def get_queryset(self):
+        if self.request.user.role != User.Role.PATIENT:
+            return AuditLog.objects.none()
+        return AuditLog.objects.filter(patient__user=self.request.user).order_by('-timestamp')
 

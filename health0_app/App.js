@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
-import { View, Platform, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { View, Platform, Text, TouchableOpacity, StyleSheet, ActivityIndicator, StatusBar } from 'react-native';
+import {
+  NavigationContainer,
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Theme } from './src/theme/Theme';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, FadeIn, FadeOut, Layout } from 'react-native-reanimated';
+
+// Contexts & Theme
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 // Patient Screens
 import PatientDashboard from './src/screens/PatientDashboard';
@@ -15,21 +23,53 @@ import SharingScreen from './src/screens/SharingScreen';
 import PrivacyScreen from './src/screens/PrivacyScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 
+// Hospital Screens
 import ClinicalDashboard from './src/screens/hospital/ClinicalDashboard';
 import PatientSearch from './src/screens/hospital/PatientSearch';
 import EMRSummary from './src/screens/hospital/EMRSummary';
 import OperationsScreen from './src/screens/hospital/OperationsScreen';
 import HospitalAnalytics from './src/screens/hospital/HospitalAnalytics';
-import DiagnosticPortal from './src/screens/hospital/DiagnosticPortal';
-import ComplianceScreen from './src/screens/hospital/ComplianceScreen';
 
 // Auth Screens
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
-import { AuthProvider, useAuth } from './src/context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
+
+function CustomTabButton({ children, onPress, accessibilityState, activeColor, inactiveColor }) {
+  const focused = accessibilityState?.selected;
+  const scale = useSharedValue(1);
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withSpring(focused ? 1.2 : 1);
+    translateY.value = withSpring(focused ? -4 : 0);
+  }, [focused]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { translateY: translateY.value }]
+  }));
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={styles.tabButtonContainer}
+    >
+      <Animated.View style={[styles.tabButtonContent, animatedStyle]}>
+        {children}
+      </Animated.View>
+      {focused && (
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          style={[styles.tabIndicator, { backgroundColor: activeColor }]}
+        />
+      )}
+    </TouchableOpacity>
+  );
+}
 
 function AuthNavigator() {
   return (
@@ -41,10 +81,18 @@ function AuthNavigator() {
 }
 
 function PatientNavigator() {
+  const { theme } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarButton: (props) => (
+          <CustomTabButton
+            {...props}
+            activeColor={theme.colors.secondary}
+            inactiveColor={theme.colors.textSecondary}
+          />
+        ),
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === 'Overview') iconName = 'dashboard';
@@ -52,11 +100,11 @@ function PatientNavigator() {
           else if (route.name === 'Sharing') iconName = 'share';
           else if (route.name === 'Privacy') iconName = 'security';
           else if (route.name === 'Vitals') iconName = 'insights';
-          return <MaterialIcons name={iconName} size={size} color={color} />;
+          return <MaterialIcons name={iconName} size={24} color={color} />;
         },
-        tabBarActiveTintColor: Theme.colors.secondary,
-        tabBarInactiveTintColor: Theme.colors.textSecondary,
-        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: theme.colors.secondary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarStyle: [styles.tabBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.outline }],
         tabBarLabelStyle: styles.tabLabel,
       })}
     >
@@ -70,10 +118,18 @@ function PatientNavigator() {
 }
 
 function HospitalNavigator() {
+  const { theme } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarButton: (props) => (
+          <CustomTabButton
+            {...props}
+            activeColor={theme.colors.clinical.primary}
+            inactiveColor={theme.colors.textSecondary}
+          />
+        ),
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === 'Command') iconName = 'monitor-dashboard';
@@ -82,12 +138,11 @@ function HospitalNavigator() {
           else if (route.name === 'Ops') iconName = 'calendar-month';
           else if (route.name === 'Intelligence') iconName = 'shield-check';
 
-          const IconComponent = MaterialCommunityIcons;
-          return <IconComponent name={iconName} size={size} color={color} />;
+          return <MaterialCommunityIcons name={iconName} size={24} color={color} />;
         },
-        tabBarActiveTintColor: Theme.colors.clinical.primary,
-        tabBarInactiveTintColor: Theme.colors.textSecondary,
-        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: theme.colors.clinical.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarStyle: [styles.tabBar, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.outline }],
         tabBarLabelStyle: styles.tabLabel,
       })}
     >
@@ -102,33 +157,39 @@ function HospitalNavigator() {
 
 function Navigation() {
   const { user, isLoading } = useAuth();
-  const [role, setRole] = useState('patient');
+  const { theme, isDarkMode, toggleTheme } = useTheme();
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={Theme.colors.primary} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+        <ActivityIndicator size="large" color={theme.colors.secondary} />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-      {/* Dev Role Switcher */}
-      {!user && (
-        <View style={styles.devBanner}>
-          <Text style={styles.devText}>Health0 Dev Mode: Viewing as </Text>
-          <TouchableOpacity
-            onPress={() => setRole(role === 'patient' ? 'hospital' : 'patient')}
-            style={[styles.roleBtn, { backgroundColor: role === 'patient' ? Theme.colors.secondary : Theme.colors.clinical.primary }]}
-          >
-            <Text style={styles.roleBtnText}>{role.toUpperCase()}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+
+
+      <NavigationContainer theme={{
+        ...(isDarkMode ? NavigationDarkTheme : NavigationDefaultTheme),
+        colors: {
+          ...(isDarkMode ? NavigationDarkTheme.colors : NavigationDefaultTheme.colors),
+          primary: theme.colors.secondary,
+          background: theme.colors.background,
+          card: theme.colors.surface,
+          text: theme.colors.text,
+          border: theme.colors.outline,
+          notification: theme.colors.error,
+        }
+      }}>
+        <Stack.Navigator screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: theme.colors.background },
+          presentation: 'card'
+        }}>
           {user ? (
             user.role === 'PATIENT' ? (
               <Stack.Screen name="PatientTabs" component={PatientNavigator} />
@@ -136,11 +197,7 @@ function Navigation() {
               <Stack.Screen name="HospitalTabs" component={HospitalNavigator} />
             )
           ) : (
-            role === 'patient' ? (
-              <Stack.Screen name="Auth" component={AuthNavigator} />
-            ) : (
-              <Stack.Screen name="HospitalTabs" component={HospitalNavigator} />
-            )
+            <Stack.Screen name="Auth" component={AuthNavigator} />
           )}
           <Stack.Screen name="Profile" component={ProfileScreen} />
         </Stack.Navigator>
@@ -151,9 +208,11 @@ function Navigation() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Navigation />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Navigation />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
@@ -162,39 +221,46 @@ const styles = StyleSheet.create({
     height: Platform.OS === 'ios' ? 90 : 70,
     paddingBottom: Platform.OS === 'ios' ? 30 : 10,
     paddingTop: 10,
-    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: Theme.colors.outline,
     ...Platform.select({
       web: { boxShadow: '0 -4px 12px rgba(0,0,0,0.05)' },
-      default: Theme.shadows.lg,
+      default: { elevation: 10 },
     })
+  },
+  tabButtonContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabButtonContent: {
+    alignItems: 'center',
+    padding: 4,
+  },
+  tabIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 4,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: '700',
+    marginTop: 4,
   },
-  devBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  themeToggle: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
-    backgroundColor: '#1e293b',
-    paddingVertical: 8,
-    zIndex: 100,
-  },
-  devText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  roleBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  roleBtnText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '900',
+    alignItems: 'center',
+    zIndex: 999,
+    borderWidth: 1,
+    ...Platform.select({
+      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
+      default: { elevation: 5 },
+    })
   }
 });

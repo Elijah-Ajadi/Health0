@@ -1,11 +1,40 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PageWrapper } from '../../components/PageWrapper';
 import { Theme } from '../../theme/Theme';
+import { useAuth } from '../../context/AuthContext';
+import Config from '../../config';
 
-export default function EMRSummary() {
+export default function EMRSummary({ route, navigation }) {
+    const { patientId } = route.params || {};
+    const { token } = useAuth();
+    const [patient, setPatient] = useState(null);
+    const [records, setRecords] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchData = async () => {
+        if (!patientId) return;
+        try {
+            const response = await fetch(`${Config.BASE_URL}/api/hospital/patient/${patientId}/`, {
+                headers: { 'Authorization': `Token ${token}` }
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setPatient(data.profile);
+                setRecords(data.records);
+            }
+        } catch (error) {
+            console.error('Error fetching EMR:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, [patientId]);
     const TimelineItem = ({ year, event, hospital, type }) => (
         <View style={styles.timelineItem}>
             <View style={styles.timelineLeft}>
@@ -21,16 +50,25 @@ export default function EMRSummary() {
         </View>
     );
 
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Theme.colors.background }}>
+                <ActivityIndicator size="large" color={Theme.colors.clinical.primary} />
+                <Text style={{ marginTop: 12, color: Theme.colors.textSecondary, fontWeight: '600' }}>Retrieving Secure Health Ledger...</Text>
+            </View>
+        );
+    }
+
     return (
         <PageWrapper
             header={
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.backButton}>
+                    <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                         <MaterialIcons name="arrow-back" size={24} color={Theme.colors.text} />
                     </TouchableOpacity>
                     <View style={styles.patientBrief}>
-                        <Text style={styles.patientName}>Olawale Benjamin</Text>
-                        <Text style={styles.patientId}>ID: HV-092-118-X • 29 Yrs • Male</Text>
+                        <Text style={styles.patientName}>{patient?.user?.first_name} {patient?.user?.last_name}</Text>
+                        <Text style={styles.patientId}>ID: {patient?.nin} • {patient?.blood_group} • {patient?.genotype}</Text>
                     </View>
                     <TouchableOpacity style={styles.moreButton}>
                         <MaterialIcons name="more-vert" size={24} color={Theme.colors.text} />
@@ -48,15 +86,15 @@ export default function EMRSummary() {
                 <View style={styles.alertGrid}>
                     <View style={styles.alertPill}>
                         <Text style={styles.alertLabel}>Allergies:</Text>
-                        <Text style={styles.alertVal}>Penicillin, Peanuts</Text>
+                        <Text style={styles.alertVal}>{patient?.allergies || 'NONE RECORDED'}</Text>
                     </View>
                     <View style={styles.alertPill}>
-                        <Text style={styles.alertLabel}>Chronic:</Text>
-                        <Text style={styles.alertVal}>Hypertension (Stage 1)</Text>
+                        <Text style={styles.alertLabel}>Infectious Diseases:</Text>
+                        <Text style={styles.alertVal}>{patient?.infectious_diseases || 'NONE RECORDED'}</Text>
                     </View>
                     <View style={styles.alertPill}>
-                        <Text style={styles.alertLabel}>High-Risk Meds:</Text>
-                        <Text style={styles.alertVal}>Lisinopril 10mg</Text>
+                        <Text style={styles.alertLabel}>Clinical Status:</Text>
+                        <Text style={[styles.alertVal, { fontWeight: '800', color: Theme.colors.success }]}>VERIFIED (INTERSWITCH ID)</Text>
                     </View>
                 </View>
             </View>
@@ -65,25 +103,33 @@ export default function EMRSummary() {
             <View style={styles.metricsRow}>
                 <View style={styles.metricItem}>
                     <Text style={styles.mLabel}>BLOOD GROUP</Text>
-                    <Text style={[styles.mVal, { color: Theme.colors.error }]}>O+</Text>
+                    <Text style={[styles.mVal, { color: Theme.colors.error }]}>{patient?.blood_group || 'N/A'}</Text>
                 </View>
                 <View style={[styles.metricItem, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: Theme.colors.outline }]}>
                     <Text style={styles.mLabel}>GENOTYPE</Text>
-                    <Text style={styles.mVal}>AA</Text>
+                    <Text style={styles.mVal}>{patient?.genotype || 'N/A'}</Text>
                 </View>
                 <View style={styles.metricItem}>
-                    <Text style={styles.mLabel}>LATEST BP</Text>
-                    <Text style={styles.mVal}>118/79</Text>
+                    <Text style={styles.mLabel}>RECORDS</Text>
+                    <Text style={styles.mVal}>{records.length}</Text>
                 </View>
             </View>
 
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>UNIFIED CLINICAL TIMELINE (ALL FACILITIES)</Text>
                 <View style={styles.timelineContainer}>
-                    <TimelineItem year="2026" event="Cardiology Consultation" hospital="Lagos General Hospital" type="Current Visit" />
-                    <TimelineItem year="2025" event="Appendectomy Surgery" hospital="St. Jude Specialist" type="In-Patient" />
-                    <TimelineItem year="2024" event="Severe Malaria Treatment" hospital="MedPlus Clinic" type="Emergency" />
-                    <TimelineItem year="2023" event="Physical Examination" hospital="Lagoon Hospital" type="General" />
+                    {records.map((record) => (
+                        <TimelineItem
+                            key={record.id}
+                            year={new Date(record.created_at).getFullYear()}
+                            event={record.title}
+                            hospital={record.hospital_name || 'Health0 System'}
+                            type={record.is_verified ? 'OFFICIAL' : 'USER UPLOAD'}
+                        />
+                    ))}
+                    {records.length === 0 && (
+                        <Text style={{ color: Theme.colors.textSecondary }}>No clinical history found.</Text>
+                    )}
                 </View>
             </View>
 

@@ -101,12 +101,16 @@ export default function ProfileScreen({ navigation }) {
 
             const result = await response.json();
             if (response.ok) {
-                // Update local auth context with new user data (if name/email changed)
+                // result is the PatientProfile, we need to update the user object
                 const updatedUser = {
                     ...user,
                     first_name: formData.first_name,
                     last_name: formData.last_name,
-                    email: formData.email
+                    email: formData.email,
+                    patient_profile: {
+                        ...user.patient_profile,
+                        ...result
+                    }
                 };
                 await login(updatedUser, token);
                 Alert.alert("Success", "Profile updated successfully.");
@@ -283,13 +287,12 @@ const styles = StyleSheet.create({
         borderRadius: 28,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+        marginVertical: 10,
         marginBottom: 30,
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
+        ...Platform.select({
+            web: { boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+            default: { elevation: 4 }
+        }),
     },
     disabledBtn: {
         opacity: 0.7,

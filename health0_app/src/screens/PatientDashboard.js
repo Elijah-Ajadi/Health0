@@ -1,29 +1,128 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView, Modal, Pressable, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView, Modal, Pressable, Linking, RefreshControl, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, FadeIn, FadeOut, Layout, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 import { PageWrapper } from '../components/PageWrapper';
 import { Theme } from '../theme/Theme';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import Config from '../config';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function PatientDashboard({ navigation }) {
-    const { user, logout } = useAuth();
+    const { user, token, logout } = useAuth();
+    const { theme, isDarkMode } = useTheme();
     const { width } = useWindowDimensions();
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+    // Dynamic Data State
+    const [profile, setProfile] = useState(null);
+    const [auditLogs, setAuditLogs] = useState([]);
+    const [recentRecords, setRecentRecords] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [showEventModal, setShowEventModal] = useState(false);
+
+    // New Event Form State
+    const [eventTitle, setEventTitle] = useState('');
+    const [eventFacility, setEventFacility] = useState('');
+    const [eventNote, setEventNote] = useState('');
+    const [eventDate, setEventDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
+    const { toggleTheme } = useTheme();
+
     const isWeb = width > 768;
+
+    const fetchData = async () => {
+        try {
+            const headers = { 'Authorization': `Token ${token}` };
+
+            // 1. Fetch Profile
+            const profileRes = await fetch(`${Config.BASE_URL}/api/profile/`, { headers });
+            const profileData = await profileRes.json();
+            if (profileRes.ok) setProfile(profileData);
+
+            // 2. Fetch Audit Logs
+            const auditRes = await fetch(`${Config.BASE_URL}/api/audit-log/`, { headers });
+            const auditData = await auditRes.json();
+            if (auditRes.ok) setAuditLogs(auditData.slice(0, 5));
+
+            // 3. Fetch Records
+            const recordsRes = await fetch(`${Config.BASE_URL}/api/records/`, { headers });
+            const recordsData = await recordsRes.json();
+            if (recordsRes.ok) setRecentRecords(recordsData.slice(0, 5));
+
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const handleAddEvent = async () => {
+        if (!eventTitle.trim()) {
+            Alert.alert('Error', 'Please enter an event title.');
+            return;
+        }
+
+        setIsSubmittingEvent(true);
+        try {
+            const response = await fetch(`${Config.BASE_URL}/api/records/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Token ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: eventTitle,
+                    record_type: 'EVENT',
+                    description: `Facility: ${eventFacility}\nNote: ${eventNote}`,
+                    created_at: eventDate ? `${eventDate}T12:00:00Z` : undefined,
+                    file: null
+                }),
+            });
+
+            if (response.ok) {
+                Alert.alert('Success', 'Health event added to your clinical timeline.');
+                setShowEventModal(false);
+                setEventTitle('');
+                setEventFacility('');
+                setEventNote('');
+                setEventDate(new Date().toISOString().split('T')[0]);
+                fetchData();
+            } else {
+                const err = await response.json();
+                Alert.alert('Error', JSON.stringify(err));
+            }
+        } catch (error) {
+            console.error('Error adding event:', error);
+            Alert.alert('Error', 'Failed to add health event.');
+        } finally {
+            setIsSubmittingEvent(false);
+        }
+    };
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [])
+    );
 
     // --- Sub-Components ---
 
     const Header = () => (
-        <View style={isWeb ? styles.webHeader : styles.mobileHeader}>
+        <Animated.View entering={FadeInDown.duration(800)} style={isWeb ? [styles.webHeader, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.outline }] : [styles.mobileHeader, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.outline }]}>
             <View style={styles.headerLeft}>
-                <Text style={styles.brandText}>Health0</Text>
-                <View style={styles.clinicalBadge}>
-                    <Text style={styles.clinicalBadgeText}>CLINICAL ENVIRONMENT</Text>
+                <Text style={[styles.brandText, { color: theme.colors.primary }]}>Health0</Text>
+                <View style={[styles.clinicalBadge, { backgroundColor: theme.colors.clinical.bg, borderColor: theme.colors.clinical.border }]}>
+                    <Text style={[styles.clinicalBadgeText, { color: theme.colors.clinical.primary }]}>SECURE CLINICAL NODE</Text>
                 </View>
             </View>
             <View style={styles.headerRight}>
                 <TouchableOpacity style={styles.iconButton}>
-                    <MaterialIcons name="notifications-none" size={24} color={Theme.colors.textSecondary} />
+                    <MaterialIcons name="notifications-none" size={24} color={theme.colors.textSecondary} />
                     <View style={styles.notifDot} />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -31,262 +130,267 @@ export default function PatientDashboard({ navigation }) {
                     onPress={() => setShowProfileMenu(true)}
                 >
                     <Image
-                        source={{ uri: 'https://i.pravatar.cc/150?u=health0_patient' }}
-                        style={styles.profileThumbnail}
+                        source={{ uri: 'https://i.pravatar.cc/150?u=' + user?.id }}
+                        style={[styles.profileThumbnail, { borderColor: theme.colors.outline, borderWidth: 2 }]}
                     />
                 </TouchableOpacity>
             </View>
-        </View>
+        </Animated.View>
     );
 
     const IdentityHeader = () => (
-        <View style={styles.idSection}>
-            <View style={[styles.idCard, { flexDirection: isWeb ? 'row' : 'column' }]}>
+        <Animated.View entering={FadeInDown.delay(200)} style={styles.idSection}>
+            <View style={[styles.idCard, { flexDirection: isWeb ? 'row' : 'column', backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
                 <View style={styles.idMainInfo}>
                     <View style={styles.nameRow}>
-                        <Text style={styles.fullName}>{user?.first_name} {user?.last_name}</Text>
-                        <MaterialIcons name="verified" size={20} color={Theme.colors.primary} />
+                        <Text style={[styles.fullName, { color: theme.colors.text }]}>
+                            {profile?.user?.first_name || user?.first_name} {profile?.user?.last_name || user?.last_name}
+                        </Text>
+                        <MaterialIcons name="verified" size={20} color={theme.colors.secondary} />
                     </View>
-                    <Text style={styles.ninText}>NIN: {user?.patient_profile?.nin || 'Not Verified'}</Text>
-                    <View style={styles.idBadge}>
-                        <Text style={styles.idBadgeText}>PRIMARY ID: {user?.patient_profile?.nin}</Text>
+                    <Text style={[styles.ninText, { color: theme.colors.textSecondary }]}>NIN: {profile?.nin || user?.patient_profile?.nin || 'Verifying...'}</Text>
+                    <View style={[styles.idBadge, { backgroundColor: theme.colors.clinical.bg }]}>
+                        <Text style={[styles.idBadgeText, { color: theme.colors.clinical.primary }]}>PRIMARY ID: {profile?.nin || user?.patient_profile?.nin}</Text>
                     </View>
                 </View>
 
                 <View style={[styles.qrContainer, { marginTop: isWeb ? 0 : 20 }]}>
-                    <View style={styles.qrPlaceholder}>
-                        <MaterialCommunityIcons name="qrcode-scan" size={48} color={Theme.colors.text} />
+                    <View style={[styles.qrPlaceholder, { backgroundColor: theme.colors.background, borderColor: theme.colors.outline }]}>
+                        <MaterialCommunityIcons name="qrcode-scan" size={48} color={theme.colors.text} />
                     </View>
-                    <Text style={styles.qrLabel}>SCAN FOR ACCESS</Text>
+                    <Text style={[styles.qrLabel, { color: theme.colors.textSecondary }]}>SCAN FOR ACCESS</Text>
                 </View>
             </View>
-        </View>
+        </Animated.View>
     );
 
     const LifeSaverCard = () => (
-        <View style={styles.lifeSaverSection}>
+        <Animated.View entering={FadeInDown.delay(400)} style={[styles.lifeSaverSection, { backgroundColor: isDarkMode ? theme.colors.surface : '#fffafb', borderColor: isDarkMode ? theme.colors.outline : '#fee2e2' }]}>
             <View style={styles.sectionHeader}>
-                <MaterialIcons name="emergency" size={20} color={Theme.colors.error} />
-                <Text style={styles.sectionTitle}>CRITICAL MEDICAL SNAPSHOT</Text>
+                <MaterialIcons name="emergency" size={20} color={theme.colors.error} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.error }]}>CRITICAL MEDICAL SNAPSHOT</Text>
             </View>
 
             <View style={styles.snapGrid}>
-                <View style={[styles.snapItem, { borderLeftColor: Theme.colors.primary }]}>
+                <View style={[styles.snapItem, { borderLeftColor: theme.colors.primary, backgroundColor: isDarkMode ? theme.colors.background : 'white' }]}>
                     <Text style={styles.snapLabel}>BLOOD GROUP</Text>
-                    <Text style={styles.snapValue}>{user?.patient_profile?.blood_group || 'N/A'}</Text>
-                    <Text style={styles.snapSub}>GENOTYPE: {user?.patient_profile?.genotype || 'N/A'}</Text>
+                    <Text style={[styles.snapValue, { color: theme.colors.text }]}>{profile?.blood_group || user?.patient_profile?.blood_group || 'N/A'}</Text>
+                    <Text style={styles.snapSub}>GENOTYPE: {profile?.genotype || user?.patient_profile?.genotype || 'N/A'}</Text>
                 </View>
-                <View style={[styles.snapItem, { borderLeftColor: Theme.colors.error }]}>
+                <View style={[styles.snapItem, { borderLeftColor: theme.colors.error, backgroundColor: isDarkMode ? theme.colors.background : 'white' }]}>
                     <Text style={styles.snapLabel}>ACTIVE ALLERGIES</Text>
-                    <Text style={[styles.snapValue, { color: Theme.colors.error, fontSize: 16 }]}>
-                        {user?.patient_profile?.allergies || 'NONE RECORDED'}
+                    <Text style={[styles.snapValue, { color: theme.colors.error, fontSize: 16 }]}>
+                        {profile?.allergies || user?.patient_profile?.allergies || 'NONE RECORDED'}
                     </Text>
                     <Text style={styles.snapSub}>VERIFIED RECORDS ONLY</Text>
                 </View>
             </View>
 
-            <View style={styles.medsCard}>
+            <View style={[styles.medsCard, { backgroundColor: isDarkMode ? theme.colors.background : 'white' }]}>
                 <View style={styles.medsHeader}>
-                    <MaterialCommunityIcons name="pill" size={18} color={Theme.colors.secondary} />
-                    <Text style={styles.medsTitle}>CURRENT MEDICATIONS</Text>
+                    <MaterialCommunityIcons name="pill" size={18} color={theme.colors.secondary} />
+                    <Text style={[styles.medsTitle, { color: theme.colors.secondary }]}>CURRENT MEDICATIONS</Text>
                 </View>
                 <View style={styles.medList}>
-                    <Text style={styles.medItem}>• No active prescriptions found in vault.</Text>
+                    <Text style={[styles.medItem, { color: theme.colors.text }]}>• No active prescriptions found in vault.</Text>
                 </View>
             </View>
 
-            <TouchableOpacity style={styles.emergencyContact}>
+            <TouchableOpacity style={[styles.emergencyContact, { backgroundColor: isDarkMode ? theme.colors.background : 'white', borderColor: theme.colors.outline }]}>
                 <View>
                     <Text style={styles.contactLabel}>EMERGENCY CONTACT (NOK)</Text>
-                    <Text style={styles.contactName}>Contact Support to setup NOK</Text>
+                    <Text style={[styles.contactName, { color: theme.colors.text }]}>Contact Support to setup NOK</Text>
                 </View>
-                <View style={styles.callButton}>
-                    <MaterialIcons name="call" size={20} color="white" />
-                    <Text style={styles.callText}>CALL</Text>
+                <View style={[styles.callButton, { backgroundColor: theme.colors.primary }]}>
+                    <MaterialIcons name="call" size={20} color={isDarkMode ? theme.colors.background : "white"} />
+                    <Text style={[styles.callText, { color: isDarkMode ? theme.colors.background : "white" }]}>CALL</Text>
                 </View>
             </TouchableOpacity>
-        </View>
+        </Animated.View>
     );
 
     const VitalsMonitor = () => (
-        <View style={styles.vitalsSection}>
+        <Animated.View entering={FadeInDown.delay(600)} style={styles.vitalsSection}>
             <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="pulse" size={20} color={Theme.colors.error} />
-                <Text style={styles.sectionTitle}>VITAL SIGNS & MONITORING</Text>
+                <MaterialCommunityIcons name="pulse" size={20} color={theme.colors.error} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.error }]}>VITAL SIGNS & MONITORING</Text>
             </View>
 
             <View style={styles.vitalsGrid}>
-                <View style={styles.vitalBox}>
+                <View style={[styles.vitalBox, { backgroundColor: theme.colors.glass, borderColor: theme.colors.glassBorder, borderWidth: 1 }]}>
                     <Text style={styles.vitalLabel}>BLOOD PRESSURE</Text>
-                    <Text style={styles.vitalValue}>120/80</Text>
-                    <Text style={styles.vitalStatus}>STABLE</Text>
+                    <Text style={[styles.vitalValue, { color: theme.colors.text }]}>120/80</Text>
+                    <Text style={[styles.vitalStatus, { color: theme.colors.success }]}>STABLE</Text>
                 </View>
-                <View style={styles.vitalBox}>
+                <View style={[styles.vitalBox, { backgroundColor: theme.colors.glass, borderColor: theme.colors.glassBorder, borderWidth: 1 }]}>
                     <Text style={styles.vitalLabel}>BODY TEMP</Text>
-                    <Text style={styles.vitalValue}>36.5°C</Text>
-                    <Text style={styles.vitalStatus}>NORMAL</Text>
+                    <Text style={[styles.vitalValue, { color: theme.colors.text }]}>36.5°C</Text>
+                    <Text style={[styles.vitalStatus, { color: theme.colors.success }]}>NORMAL</Text>
                 </View>
             </View>
-        </View>
+        </Animated.View>
     );
 
     const ActivityTree = () => (
-        <View style={styles.timelineSection}>
+        <Animated.View entering={FadeInDown.delay(800)} style={styles.timelineSection}>
             <View style={styles.sectionHeader}>
-                <MaterialIcons name="account-tree" size={20} color={Theme.colors.primary} />
-                <Text style={styles.sectionTitle}>THE INTERACTIVE ACTIVITY TREE</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <MaterialIcons name="account-tree" size={20} color={theme.colors.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>CLINICAL TIMELINE</Text>
+                </View>
+                <TouchableOpacity
+                    style={styles.addEventBtn}
+                    onPress={() => setShowEventModal(true)}
+                >
+                    <MaterialIcons name="add" size={16} color="white" />
+                    <Text style={styles.addEventText}>Add Event</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.timelineContainer}>
-                <View style={styles.timelineLine} />
+                <View style={[styles.timelineLine, { backgroundColor: theme.colors.outline }]} />
 
-                <View style={styles.timelineItem}>
-                    <View style={[styles.timelineDot, { backgroundColor: Theme.colors.success }]}>
-                        <MaterialIcons name="local-hospital" size={10} color="white" />
-                    </View>
-                    <View style={styles.timelineCard}>
-                        <View style={styles.cardTop}>
-                            <Text style={styles.timelineDate}>MARCH 22, 2026 • 11:45 AM</Text>
-                            <View style={styles.facilityTag}><Text style={styles.facilityText}>ST. JUDE MEDICAL</Text></View>
+                {auditLogs.length > 0 ? auditLogs.map((log) => (
+                    <View key={log.id} style={styles.timelineItem}>
+                        <View style={[styles.timelineDot, { backgroundColor: log.action.includes('UPLOAD') ? theme.colors.success : theme.colors.secondary }]}>
+                            <MaterialIcons name={log.action.includes('UPLOAD') ? "add" : "visibility"} size={10} color="white" />
                         </View>
-                        <Text style={styles.activitySummary}>Post-Op Consultation: Cardiology Dept.</Text>
-                        <TouchableOpacity style={styles.expandButton}>
-                            <Text style={styles.expandText}>VIEW DEEP DIVE</Text>
-                            <MaterialIcons name="keyboard-arrow-down" size={16} color={Theme.colors.primary} />
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={styles.timelineItem}>
-                    <View style={[styles.timelineDot, { backgroundColor: Theme.colors.secondary }]}>
-                        <MaterialIcons name="science" size={10} color="white" />
-                    </View>
-                    <View style={styles.timelineCard}>
-                        <View style={styles.cardTop}>
-                            <Text style={styles.timelineDate}>MARCH 18, 2026 • 09:30 AM</Text>
-                            <View style={[styles.facilityTag, { backgroundColor: '#f0f9ff' }]}><Text style={styles.facilityText}>DIAGNOSTIC LABS</Text></View>
-                        </View>
-                        <Text style={styles.activitySummary}>Advanced Lipid Panel & CBC Results</Text>
-                        <View style={styles.verifiedTag}>
-                            <MaterialIcons name="check-circle" size={12} color={Theme.colors.success} />
-                            <Text style={styles.verifiedTagText}>HOSPITAL VERIFIED</Text>
+                        <View style={[styles.timelineCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+                            <View style={styles.cardTop}>
+                                <Text style={[styles.timelineDate, { color: theme.colors.textSecondary }]}>
+                                    {new Date(log.timestamp).toLocaleString().toUpperCase()}
+                                </Text>
+                                <View style={[styles.facilityTag, { backgroundColor: theme.colors.clinical.bg }]}>
+                                    <Text style={[styles.facilityText, { color: theme.colors.clinical.primary }]}>
+                                        {log.actor_name || 'H0 SYSTEM'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Text style={[styles.activitySummary, { color: theme.colors.text }]}>
+                                {log.action.replace(/_/g, ' ')}
+                            </Text>
                         </View>
                     </View>
-                </View>
+                )) : (
+                    <Text style={{ marginLeft: 30, color: theme.colors.textSecondary }}>No audit activity recorded.</Text>
+                )}
             </View>
-        </View>
+        </Animated.View>
     );
 
     const HealthVaultSummary = () => (
-        <View style={styles.vaultSection}>
+        <Animated.View entering={FadeInDown.delay(1000)} style={styles.vaultSection}>
             <View style={styles.sectionHeader}>
-                <MaterialIcons name="folder-special" size={20} color={Theme.colors.primary} />
-                <Text style={styles.sectionTitle}>DIGITAL HEALTH VAULT</Text>
+                <MaterialIcons name="folder-special" size={20} color={theme.colors.primary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>DIGITAL HEALTH VAULT</Text>
             </View>
 
             <View style={styles.folderRow}>
-                <TouchableOpacity style={styles.folderCard}>
-                    <MaterialCommunityIcons name="folder-home" size={24} color={Theme.colors.primary} />
-                    <Text style={styles.folderName}>Radiology</Text>
-                    <Text style={styles.folderCount}>12 Files</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.folderCard}>
-                    <MaterialCommunityIcons name="folder-text" size={24} color={Theme.colors.secondary} />
-                    <Text style={styles.folderName}>Lab Reports</Text>
-                    <Text style={styles.folderCount}>28 Files</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.folderCard}>
-                    <MaterialCommunityIcons name="folder-account" size={24} color={Theme.colors.accent} />
-                    <Text style={styles.folderName}>Prescriptions</Text>
-                    <Text style={styles.folderCount}>8 Files</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Vault')} style={[styles.folderCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+                    <MaterialCommunityIcons name="folder-text" size={24} color={theme.colors.secondary} />
+                    <Text style={[styles.folderName, { color: theme.colors.text }]}>Vault Assets</Text>
+                    <Text style={styles.folderCount}>{recentRecords.length} Recent Files</Text>
                 </TouchableOpacity>
             </View>
 
-            <Text style={styles.subSubtitle}>RECENT UPLOADS</Text>
+            <Text style={[styles.subSubtitle, { color: theme.colors.textSecondary }]}>RECENT UPLOADS</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewScroll}>
-                {[1, 2, 3].map((i) => (
-                    <View key={i} style={styles.docPreview}>
-                        <View style={styles.docThumbnail}>
-                            <MaterialCommunityIcons name="file-pdf-box" size={32} color={Theme.colors.error} />
+                {recentRecords.length > 0 ? recentRecords.map((item) => (
+                    <View key={item.id} style={[styles.docPreview, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+                        <View style={[styles.docThumbnail, { backgroundColor: theme.colors.background }]}>
+                            <MaterialCommunityIcons
+                                name={item.record_type === 'IMAGE' ? "image" : "file-pdf-box"}
+                                size={32}
+                                color={item.record_type === 'IMAGE' ? theme.colors.secondary : theme.colors.error}
+                            />
                         </View>
-                        <Text style={styles.docName}>Lab_Result_{i}.pdf</Text>
-                        <View style={styles.unverifiedTag}><Text style={styles.unverifiedText}>USER UPLOADED</Text></View>
+                        <Text numberOfLines={1} style={[styles.docName, { color: theme.colors.text }]}>{item.title}</Text>
+                        <View style={[styles.unverifiedTag, { backgroundColor: theme.colors.background }]}>
+                            <Text style={[styles.unverifiedText, { color: theme.colors.primary }]}>SECURE</Text>
+                        </View>
                     </View>
-                ))}
+                )) : (
+                    <Text style={{ color: theme.colors.textSecondary, fontSize: 12 }}>No recent uploads.</Text>
+                )}
             </ScrollView>
-        </View>
+        </Animated.View>
     );
 
     const SharingCenter = () => (
-        <View style={styles.sharingSection}>
+        <Animated.View entering={FadeInDown.delay(1200)} style={styles.sharingSection}>
             <View style={styles.sectionHeader}>
-                <MaterialIcons name="share" size={20} color={Theme.colors.primary} />
-                <Text style={styles.sectionTitle}>SHARING & RETRIEVAL CENTER</Text>
+                <MaterialIcons name="share" size={20} color={theme.colors.primary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>SHARING & PAYMENTS (INTERSWITCH POV)</Text>
             </View>
 
             <View style={styles.actionGrid}>
-                <TouchableOpacity style={styles.actionCard}>
-                    <MaterialIcons name="email" size={24} color={Theme.colors.primary} />
-                    <Text style={styles.actionLabel}>Email Secure PDF</Text>
+                {/* INTERSWITCH WEBPAY POC */}
+                <TouchableOpacity
+                    style={[styles.actionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.secondary, borderWidth: 1.5 }]}
+                    onPress={() => Alert.alert("Interswitch Webpay", "Initiating secure hospital bill payment via Interswitch...")}
+                >
+                    <MaterialIcons name="payment" size={24} color={theme.colors.secondary} />
+                    <Text style={[styles.actionLabel, { color: theme.colors.text }]}>Pay Medical Bills</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionCard}>
-                    <MaterialIcons name="local-shipping" size={24} color={Theme.colors.secondary} />
-                    <Text style={styles.actionLabel}>Physical Delivery</Text>
+
+                {/* INTERSWITCH CREDIT POC */}
+                <TouchableOpacity
+                    style={[styles.actionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.accent, borderWidth: 1.5 }]}
+                    onPress={() => Alert.alert("Interswitch Credit", "Applying for emergency health credit via Interswitch Lending...")}
+                >
+                    <MaterialCommunityIcons name="finance" size={24} color={theme.colors.accent} />
+                    <Text style={[styles.actionLabel, { color: theme.colors.text }]}>Request Health Credit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionCard}>
-                    <MaterialCommunityIcons name="cellphone-key" size={24} color={Theme.colors.accent} />
-                    <Text style={styles.actionLabel}>USSD Settings</Text>
+
+                <TouchableOpacity
+                    style={[styles.actionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}
+                    onPress={() => navigation.navigate('Sharing')}
+                >
+                    <MaterialIcons name="email" size={24} color={theme.colors.primary} />
+                    <Text style={[styles.actionLabel, { color: theme.colors.text }]}>Secure PDF Hub</Text>
                 </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.otpButton}>
+            <TouchableOpacity style={[styles.otpButton, { backgroundColor: theme.colors.text }]}>
                 <View style={styles.otpLeft}>
                     <Text style={styles.otpLabel}>ONE-TIME ACCESS CODE (OTP)</Text>
-                    <Text style={styles.otpValue}>GENERATED: 882 109</Text>
+                    <Text style={[styles.otpValue, { color: theme.colors.background }]}>GENERATED: 882 109</Text>
                 </View>
-                <MaterialIcons name="refresh" size={20} color="white" />
+                <MaterialIcons name="refresh" size={20} color={theme.colors.background} />
             </TouchableOpacity>
-        </View>
+        </Animated.View>
     );
 
     const PrivacyAudit = () => (
-        <View style={styles.auditSection}>
+        <Animated.View entering={FadeInDown.delay(1400)} style={styles.auditSection}>
             <View style={styles.sectionHeader}>
-                <MaterialIcons name="security" size={20} color={Theme.colors.secondary} />
-                <Text style={styles.sectionTitle}>ACCESS & PRIVACY AUDIT</Text>
+                <MaterialIcons name="security" size={20} color={theme.colors.secondary} />
+                <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>ACCESS & PRIVACY AUDIT</Text>
             </View>
 
-            <View style={styles.auditList}>
-                <View style={styles.auditItem}>
+            <View style={[styles.auditList, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline }]}>
+                <View style={[styles.auditItem, { borderBottomColor: theme.colors.background }]}>
                     <View style={styles.auditInfo}>
-                        <Text style={styles.auditUser}>General Hospital - Dr. Tunde</Text>
+                        <Text style={[styles.auditUser, { color: theme.colors.text }]}>General Hospital - Dr. Tunde</Text>
                         <Text style={styles.auditType}>Full Profile View</Text>
                     </View>
                     <Text style={styles.auditTime}>2h ago</Text>
                 </View>
-                <View style={styles.auditItem}>
+                <View style={[styles.auditItem, { borderBottomColor: theme.colors.background }]}>
                     <View style={styles.auditInfo}>
-                        <Text style={styles.auditUser}>Lagoon Pharmacy</Text>
+                        <Text style={[styles.auditUser, { color: theme.colors.text }]}>Lagoon Pharmacy</Text>
                         <Text style={styles.auditType}>Prescription Verification</Text>
                     </View>
                     <Text style={styles.auditTime}>Yesterday</Text>
                 </View>
             </View>
 
-            <TouchableOpacity style={styles.revokeButton}>
-                <Text style={styles.revokeText}>REVOKE ALL EXTERNAL ACCESS</Text>
+            <TouchableOpacity style={[styles.revokeButton, { backgroundColor: theme.colors.error + '15', borderColor: theme.colors.error, borderWidth: 1, borderRadius: 12 }]}>
+                <Text style={[styles.revokeText, { color: theme.colors.error, fontWeight: '800' }]}>REVOKE ALL EXTERNAL ACCESS</Text>
             </TouchableOpacity>
-        </View>
+        </Animated.View>
     );
 
-    const Navigation = () => !isWeb && (
-        <View style={styles.bottomNav}>
-            <TouchableOpacity style={styles.navTab}><MaterialIcons name="dashboard" size={24} color={Theme.colors.primary} /></TouchableOpacity>
-            <TouchableOpacity style={styles.navTab}><MaterialIcons name="folder" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
-            <TouchableOpacity style={styles.navTab}><MaterialIcons name="analytics" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
-            <TouchableOpacity style={styles.navTab} onPress={() => navigation.navigate('Profile')}><MaterialIcons name="person" size={24} color={Theme.colors.textSecondary} /></TouchableOpacity>
-        </View>
-    );
 
     const renderProfileMenu = () => (
         <Modal
@@ -299,10 +403,15 @@ export default function PatientDashboard({ navigation }) {
                 style={styles.modalOverlay}
                 onPress={() => setShowProfileMenu(false)}
             >
-                <View style={[styles.profileMenu, isWeb && styles.webProfileMenu]}>
-                    <View style={styles.menuHeader}>
-                        <Text style={styles.menuUserName}>{user?.first_name} {user?.last_name}</Text>
-                        <Text style={styles.menuUserEmail}>{user?.email}</Text>
+                <Animated.View
+                    entering={FadeIn.duration(200)}
+                    style={[styles.profileMenu, isWeb && styles.webProfileMenu, { backgroundColor: theme.colors.surface }]}
+                >
+                    <View style={[styles.menuHeader, { borderBottomColor: theme.colors.outline }]}>
+                        <Text style={[styles.menuUserName, { color: theme.colors.text }]}>
+                            {profile?.user?.first_name || user?.first_name} {profile?.user?.last_name || user?.last_name}
+                        </Text>
+                        <Text style={[styles.menuUserEmail, { color: theme.colors.textSecondary }]}>{profile?.user?.email || user?.email}</Text>
                     </View>
 
                     <TouchableOpacity
@@ -312,8 +421,8 @@ export default function PatientDashboard({ navigation }) {
                             navigation.navigate('Profile');
                         }}
                     >
-                        <MaterialIcons name="person-outline" size={22} color={Theme.colors.primary} />
-                        <Text style={styles.menuItemText}>Edit Profile</Text>
+                        <MaterialIcons name="person-outline" size={22} color={theme.colors.primary} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Edit Profile</Text>
                     </TouchableOpacity>
 
                     {(user?.role === 'ADMIN' || user?.is_staff_admin || user?.is_superuser) && (
@@ -325,19 +434,33 @@ export default function PatientDashboard({ navigation }) {
                                     Linking.openURL('http://localhost:5173/');
                                 }}
                             >
-                                <MaterialCommunityIcons name="view-dashboard-variant" size={22} color={Theme.colors.secondary} />
-                                <Text style={[styles.menuItemText, { color: Theme.colors.secondary }]}>Admin Dashboard</Text>
+                                <MaterialCommunityIcons name="view-dashboard-variant" size={22} color={theme.colors.secondary} />
+                                <Text style={[styles.menuItemText, { color: theme.colors.secondary }]}>Admin Dashboard</Text>
                             </TouchableOpacity>
-                            <View style={styles.menuDivider} />
+                            <View style={[styles.menuDivider, { backgroundColor: theme.colors.outline }]} />
                         </>
                     )}
 
                     <TouchableOpacity style={styles.menuItem}>
-                        <MaterialIcons name="settings" size={22} color={Theme.colors.textSecondary} />
-                        <Text style={styles.menuItemText}>Account Settings</Text>
+                        <MaterialIcons name="settings" size={22} color={theme.colors.textSecondary} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Account Settings</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.menuDivider} />
+                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.outline }]} />
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => {
+                            toggleTheme();
+                        }}
+                    >
+                        <MaterialIcons name={isDarkMode ? "light-mode" : "dark-mode"} size={22} color={theme.colors.warning} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.text }]}>
+                            {isDarkMode ? "Light Mode" : "Dark Mode"}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.outline }]} />
 
                     <TouchableOpacity
                         style={styles.menuItem}
@@ -346,36 +469,138 @@ export default function PatientDashboard({ navigation }) {
                             logout();
                         }}
                     >
-                        <MaterialIcons name="logout" size={22} color={Theme.colors.error} />
-                        <Text style={[styles.menuItemText, { color: Theme.colors.error }]}>Logout</Text>
+                        <MaterialIcons name="logout" size={22} color={theme.colors.error} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.error }]}>Logout</Text>
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
             </Pressable>
+        </Modal>
+    );
+
+    const AddEventModal = () => (
+        <Modal
+            visible={showEventModal}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowEventModal(false)}
+        >
+            <View style={styles.modalOverlayFull}>
+                <Animated.View
+                    entering={FadeInUp}
+                    style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}
+                >
+                    <View style={styles.modalHeader}>
+                        <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Log Health Event</Text>
+                        <TouchableOpacity onPress={() => setShowEventModal(false)}>
+                            <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>EVENT TITLE</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: isDarkMode ? theme.colors.background : '#f8fafc', color: theme.colors.text, borderColor: theme.colors.outline }]}
+                            placeholder="e.g. Annual Medical Checkup"
+                            value={eventTitle}
+                            onChangeText={setEventTitle}
+                            placeholderTextColor={theme.colors.textSecondary}
+                        />
+                    </View>
+
+                    <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>EVENT DATE</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: isDarkMode ? theme.colors.background : '#f8fafc', color: theme.colors.text, borderColor: theme.colors.outline }]}
+                            placeholder="YYYY-MM-DD"
+                            value={eventDate}
+                            onChangeText={setEventDate}
+                            placeholderTextColor={theme.colors.textSecondary}
+                        />
+                    </View>
+
+                    <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>MEDICAL FACILITY</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: isDarkMode ? theme.colors.background : '#f8fafc', color: theme.colors.text, borderColor: theme.colors.outline }]}
+                            placeholder="e.g. St. Nicholas Hospital"
+                            value={eventFacility}
+                            onChangeText={setEventFacility}
+                            placeholderTextColor={theme.colors.textSecondary}
+                        />
+                    </View>
+
+                    <View style={styles.formGroup}>
+                        <Text style={[styles.label, { color: theme.colors.textSecondary }]}>ADDITIONAL NOTES</Text>
+                        <TextInput
+                            style={[styles.input, { backgroundColor: isDarkMode ? theme.colors.background : '#f8fafc', color: theme.colors.text, borderColor: theme.colors.outline, height: 100, textAlignVertical: 'top' }]}
+                            placeholder="Brief details about the visit..."
+                            multiline
+                            value={eventNote}
+                            onChangeText={setEventNote}
+                            placeholderTextColor={theme.colors.textSecondary}
+                        />
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.submitBtn, { backgroundColor: theme.colors.clinical.primary }]}
+                        onPress={handleAddEvent}
+                        disabled={isSubmittingEvent}
+                    >
+                        {isSubmittingEvent ? (
+                            <ActivityIndicator color="white" />
+                        ) : (
+                            <Text style={styles.submitBtnText}>Add to Clinical Record</Text>
+                        )}
+                    </TouchableOpacity>
+                </Animated.View>
+            </View>
         </Modal>
     );
 
     // --- Main Layout ---
 
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+            </View>
+        );
+    }
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        fetchData();
+    };
+
     return (
         <PageWrapper
             header={<Header />}
-            footer={<Navigation />}
-            contentContainerStyle={styles.container}
+            contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}
         >
-            <IdentityHeader />
-            <LifeSaverCard />
-            <VitalsMonitor />
-            <ActivityTree />
-            <HealthVaultSummary />
-            <SharingCenter />
-            <PrivacyAudit />
+            <ScrollView
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                showsVerticalScrollIndicator={false}
+            >
+                <IdentityHeader />
+                <LifeSaverCard />
+                <VitalsMonitor />
+                <ActivityTree />
+                <HealthVaultSummary />
+                <SharingCenter />
+                <PrivacyAudit />
+                <View style={{ height: 120 }} />
+            </ScrollView>
 
             {/* Action FAB */}
-            <TouchableOpacity style={styles.fab}>
-                <MaterialIcons name="add-a-photo" size={28} color="white" />
+            <TouchableOpacity
+                style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+                onPress={() => navigation.navigate('Vault')}
+            >
+                <MaterialIcons name="add-a-photo" size={28} color={isDarkMode ? theme.colors.background : 'white'} />
             </TouchableOpacity>
 
             {renderProfileMenu()}
+            {AddEventModal()}
         </PageWrapper>
     );
 }
@@ -387,32 +612,25 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
         width: '100%',
     },
-
-    // Header Styles
     webHeader: {
         height: 70,
-        backgroundColor: Theme.colors.surface,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: Theme.spacing.xl,
         borderBottomWidth: 1,
-        borderBottomColor: Theme.colors.outline,
     },
     mobileHeader: {
         height: 64,
-        backgroundColor: Theme.colors.surface,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: Theme.spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: Theme.colors.outline,
     },
     brandText: {
         fontSize: 22,
         fontWeight: '900',
-        color: Theme.colors.primary,
         letterSpacing: -1,
     },
     headerLeft: {
@@ -421,17 +639,14 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     clinicalBadge: {
-        backgroundColor: Theme.colors.background,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
     },
     clinicalBadgeText: {
         fontSize: 9,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
         letterSpacing: 0.5,
     },
     headerRight: {
@@ -443,7 +658,6 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: Theme.colors.outline,
     },
     iconButton: {
         padding: 4,
@@ -455,12 +669,9 @@ const styles = StyleSheet.create({
         right: 4,
         width: 8,
         height: 8,
-        backgroundColor: Theme.colors.error,
         borderRadius: 4,
         borderWidth: 2,
-        borderColor: 'white',
     },
-
     profileBtn: {
         padding: 2,
     },
@@ -472,21 +683,16 @@ const styles = StyleSheet.create({
         paddingTop: Platform.OS === 'web' ? 70 : 64,
         paddingRight: 20,
     },
+    modalOverlayFull: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
     profileMenu: {
         width: 250,
-        backgroundColor: 'white',
         borderRadius: 16,
         padding: 8,
-        elevation: 10,
-        ...Platform.select({
-            web: { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
-            default: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
-                shadowRadius: 10,
-            }
-        })
+        ...Theme.shadows.lg,
     },
     webProfileMenu: {
         width: 280,
@@ -494,17 +700,14 @@ const styles = StyleSheet.create({
     menuHeader: {
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: Theme.colors.outline,
         marginBottom: 8,
     },
     menuUserName: {
         fontSize: 16,
         fontWeight: '800',
-        color: Theme.colors.text,
     },
     menuUserEmail: {
         fontSize: 12,
-        color: Theme.colors.textSecondary,
         marginTop: 2,
     },
     menuItem: {
@@ -517,30 +720,21 @@ const styles = StyleSheet.create({
     menuItemText: {
         fontSize: 14,
         fontWeight: '600',
-        color: Theme.colors.text,
     },
     menuDivider: {
         height: 1,
-        backgroundColor: Theme.colors.outline,
         marginVertical: 8,
     },
-
-    // Identity Section Styles
     idSection: {
         marginBottom: Theme.spacing.lg,
     },
     idCard: {
-        backgroundColor: Theme.colors.surface,
         padding: Theme.spacing.lg,
         borderRadius: Theme.borderRadius.xl,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
         justifyContent: 'space-between',
         alignItems: 'center',
-        ...Platform.select({
-            web: { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
-            default: { elevation: 2 }
-        })
+        ...Theme.shadows.sm,
     },
     idMainInfo: {
         flex: 1,
@@ -554,16 +748,13 @@ const styles = StyleSheet.create({
     fullName: {
         fontSize: 24,
         fontWeight: '800',
-        color: Theme.colors.text,
     },
     ninText: {
         fontSize: 14,
-        color: Theme.colors.textSecondary,
         fontWeight: '600',
         marginBottom: 12,
     },
     idBadge: {
-        backgroundColor: '#eff6ff',
         alignSelf: 'flex-start',
         paddingHorizontal: 12,
         paddingVertical: 6,
@@ -572,7 +763,6 @@ const styles = StyleSheet.create({
     idBadgeText: {
         fontSize: 11,
         fontWeight: '700',
-        color: Theme.colors.primary,
         fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     qrContainer: {
@@ -581,40 +771,32 @@ const styles = StyleSheet.create({
     qrPlaceholder: {
         width: 100,
         height: 100,
-        backgroundColor: Theme.colors.background,
         borderRadius: Theme.borderRadius.lg,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
         marginBottom: 8,
     },
     qrLabel: {
         fontSize: 10,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
         letterSpacing: 1,
     },
-
-    // Life Saver Section Styles
     lifeSaverSection: {
         padding: Theme.spacing.lg,
         borderRadius: Theme.borderRadius.xl,
-        borderWidth: 1,
-        borderColor: '#fee2e2',
-        backgroundColor: '#fffafb',
+        borderWidth: 2,
         marginBottom: Theme.spacing.lg,
     },
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        justifyContent: 'space-between',
         marginBottom: Theme.spacing.md,
     },
     sectionTitle: {
         fontSize: 12,
         fontWeight: '900',
-        color: Theme.colors.error,
         letterSpacing: 1,
     },
     snapGrid: {
@@ -624,34 +806,26 @@ const styles = StyleSheet.create({
     },
     snapItem: {
         flex: 1,
-        backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.lg,
         borderLeftWidth: 4,
-        ...Platform.select({
-            web: { boxShadow: '0 2px 5px rgba(0,0,0,0.02)' },
-            default: { elevation: 1 }
-        })
+        ...Theme.shadows.sm,
     },
     snapLabel: {
         fontSize: 9,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
         marginBottom: 4,
     },
     snapValue: {
         fontSize: 20,
         fontWeight: '800',
-        color: Theme.colors.text,
     },
     snapSub: {
         fontSize: 10,
         fontWeight: '600',
-        color: Theme.colors.textSecondary,
         marginTop: 2,
     },
     medsCard: {
-        backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.lg,
         marginBottom: Theme.spacing.md,
@@ -665,150 +839,43 @@ const styles = StyleSheet.create({
     medsTitle: {
         fontSize: 11,
         fontWeight: '800',
-        color: Theme.colors.secondary,
     },
     medList: {
         gap: 4,
     },
     medItem: {
         fontSize: 13,
-        color: Theme.colors.text,
         fontWeight: '500',
     },
     emergencyContact: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.lg,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
     },
     contactLabel: {
         fontSize: 9,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
         marginBottom: 2,
     },
     contactName: {
         fontSize: 15,
         fontWeight: '700',
-        color: Theme.colors.text,
     },
     callButton: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: Theme.colors.primary,
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: Theme.borderRadius.md,
     },
     callText: {
-        color: 'white',
         fontSize: 12,
         fontWeight: '800',
     },
-
-    // Sharing Styles
-    sharingSection: {
-        marginBottom: Theme.spacing.lg,
-    },
-    actionGrid: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: Theme.spacing.md,
-        marginBottom: Theme.spacing.md,
-    },
-    actionCard: {
-        flex: 1,
-        backgroundColor: 'white',
-        padding: Theme.spacing.md,
-        borderRadius: Theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: Theme.colors.outline,
-        alignItems: 'center',
-        gap: 8,
-    },
-    actionLabel: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: Theme.colors.text,
-        textAlign: 'center',
-    },
-    otpButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: Theme.colors.text,
-        padding: Theme.spacing.md,
-        borderRadius: Theme.borderRadius.lg,
-    },
-    otpLeft: {
-        gap: 2,
-    },
-    otpLabel: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: 'rgba(255,255,255,0.6)',
-    },
-    otpValue: {
-        fontSize: 16,
-        fontWeight: '800',
-        color: 'white',
-        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    },
-
-    // Audit Styles
-    auditSection: {
-        marginBottom: Theme.spacing.xxl,
-    },
-    auditList: {
-        backgroundColor: 'white',
-        borderRadius: Theme.borderRadius.lg,
-        borderWidth: 1,
-        borderColor: Theme.colors.outline,
-        overflow: 'hidden',
-        marginTop: Theme.spacing.md,
-        marginBottom: Theme.spacing.md,
-    },
-    auditItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: Theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: Theme.colors.background,
-    },
-    auditUser: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: Theme.colors.text,
-    },
-    auditType: {
-        fontSize: 10,
-        color: Theme.colors.textSecondary,
-    },
-    auditTime: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: Theme.colors.textSecondary,
-    },
-    revokeButton: {
-        padding: 12,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: Theme.colors.error,
-        borderRadius: Theme.borderRadius.md,
-    },
-    revokeText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: Theme.colors.error,
-    },
-
-    // Vitals Styles
     vitalsSection: {
         marginBottom: Theme.spacing.lg,
     },
@@ -819,52 +886,44 @@ const styles = StyleSheet.create({
     },
     vitalBox: {
         flex: 1,
-        backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.lg,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
     },
     vitalLabel: {
         fontSize: 9,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
         marginBottom: 4,
     },
     vitalValue: {
         fontSize: 18,
         fontWeight: '800',
-        color: Theme.colors.text,
     },
     vitalStatus: {
         fontSize: 10,
         fontWeight: '700',
-        color: Theme.colors.success,
         marginTop: 2,
     },
-
-    // Navigation Styles
-    bottomNav: {
-        height: 70,
-        flexDirection: 'row',
-        backgroundColor: 'white',
-        borderTopWidth: 1,
-        borderTopColor: Theme.colors.outline,
-        paddingBottom: Platform.OS === 'ios' ? 20 : 0,
-    },
-    navTab: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    // Timeline Styles
     timelineSection: {
         marginBottom: Theme.spacing.lg,
+    },
+    addEventBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 4,
+    },
+    addEventText: {
+        color: 'white',
+        fontSize: 11,
+        fontWeight: '700',
     },
     timelineContainer: {
         paddingLeft: Theme.spacing.lg,
         marginTop: Theme.spacing.md,
+        position: 'relative',
     },
     timelineLine: {
         position: 'absolute',
@@ -872,7 +931,6 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         width: 2,
-        backgroundColor: Theme.colors.outline,
         zIndex: -1,
     },
     timelineItem: {
@@ -884,7 +942,6 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: Theme.colors.primary,
         borderWidth: 4,
         borderColor: 'white',
         justifyContent: 'center',
@@ -893,15 +950,10 @@ const styles = StyleSheet.create({
     },
     timelineCard: {
         flex: 1,
-        backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.lg,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
-        ...Platform.select({
-            web: { boxShadow: '0 2px 5px rgba(0,0,0,0.02)' },
-            default: { elevation: 1 }
-        })
+        ...Theme.shadows.sm,
     },
     cardTop: {
         flexDirection: 'row',
@@ -912,10 +964,8 @@ const styles = StyleSheet.create({
     timelineDate: {
         fontSize: 10,
         fontWeight: '700',
-        color: Theme.colors.textSecondary,
     },
     facilityTag: {
-        backgroundColor: '#f0fdf4',
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 4,
@@ -923,36 +973,12 @@ const styles = StyleSheet.create({
     facilityText: {
         fontSize: 8,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
     },
     activitySummary: {
         fontSize: 14,
         fontWeight: '600',
-        color: Theme.colors.text,
         marginBottom: 8,
     },
-    expandButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    expandText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: Theme.colors.primary,
-    },
-    verifiedTag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    verifiedTagText: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: Theme.colors.success,
-    },
-
-    // Vault Styles
     vaultSection: {
         marginBottom: Theme.spacing.lg,
     },
@@ -964,27 +990,22 @@ const styles = StyleSheet.create({
     },
     folderCard: {
         flex: 1,
-        backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.lg,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
         alignItems: 'center',
         gap: 4,
     },
     folderName: {
         fontSize: 12,
         fontWeight: '700',
-        color: Theme.colors.text,
     },
     folderCount: {
         fontSize: 10,
-        color: Theme.colors.textSecondary,
     },
     subSubtitle: {
         fontSize: 10,
         fontWeight: '800',
-        color: Theme.colors.textSecondary,
         marginBottom: 12,
         letterSpacing: 1,
     },
@@ -994,16 +1015,13 @@ const styles = StyleSheet.create({
     },
     docPreview: {
         width: 140,
-        backgroundColor: 'white',
         padding: 10,
         borderRadius: Theme.borderRadius.md,
         borderWidth: 1,
-        borderColor: Theme.colors.outline,
         marginRight: 12,
     },
     docThumbnail: {
         height: 80,
-        backgroundColor: Theme.colors.background,
         borderRadius: 4,
         justifyContent: 'center',
         alignItems: 'center',
@@ -1012,11 +1030,9 @@ const styles = StyleSheet.create({
     docName: {
         fontSize: 11,
         fontWeight: '600',
-        color: Theme.colors.text,
         marginBottom: 4,
     },
     unverifiedTag: {
-        backgroundColor: '#fff7ed',
         alignSelf: 'flex-start',
         paddingHorizontal: 6,
         paddingVertical: 2,
@@ -1025,23 +1041,161 @@ const styles = StyleSheet.create({
     unverifiedText: {
         fontSize: 8,
         fontWeight: '800',
-        color: '#9a3412',
     },
-
+    sharingSection: {
+        marginBottom: Theme.spacing.lg,
+    },
+    actionGrid: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: Theme.spacing.md,
+        marginBottom: Theme.spacing.md,
+    },
+    actionCard: {
+        flex: 1,
+        padding: Theme.spacing.md,
+        borderRadius: Theme.borderRadius.lg,
+        borderWidth: 1.5,
+        alignItems: 'center',
+        gap: 8,
+    },
+    actionLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    otpButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: Theme.spacing.md,
+        borderRadius: Theme.borderRadius.lg,
+    },
+    otpLeft: {
+        gap: 2,
+    },
+    otpLabel: {
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    otpValue: {
+        fontSize: 16,
+        fontWeight: '800',
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    },
+    auditSection: {
+        marginBottom: Theme.spacing.xxl,
+    },
+    auditList: {
+        borderRadius: Theme.borderRadius.lg,
+        borderWidth: 1,
+        overflow: 'hidden',
+        marginTop: Theme.spacing.md,
+        marginBottom: Theme.spacing.md,
+    },
+    auditItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: Theme.spacing.md,
+        borderBottomWidth: 1,
+    },
+    auditInfo: {
+        gap: 2,
+    },
+    auditUser: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    auditType: {
+        fontSize: 10,
+    },
+    auditTime: {
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    revokeButton: {
+        padding: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: Theme.borderRadius.md,
+    },
+    revokeText: {
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    bottomNav: {
+        height: 70,
+        flexDirection: 'row',
+        borderTopWidth: 1,
+    },
+    navTab: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     fab: {
         position: 'absolute',
-        bottom: Platform.OS === 'web' ? 30 : 100, // Account for bottom nav
+        bottom: Platform.OS === 'web' ? 30 : 100,
         right: 30,
         width: 60,
         height: 60,
-        backgroundColor: Theme.colors.primary,
         borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 100,
-        ...Platform.select({
-            web: { boxShadow: '0 4px 10px rgba(0,0,0,0.3)' },
-            default: { elevation: 8 }
-        })
+    },
+    modalContent: {
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        padding: 24,
+        minHeight: 500,
+        ...Theme.shadows.xl,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontWeight: '900',
+    },
+    formGroup: {
+        marginBottom: 24,
+    },
+    label: {
+        fontSize: 11,
+        fontWeight: '900',
+        marginBottom: 8,
+        letterSpacing: 1,
+    },
+    input: {
+        borderRadius: 16,
+        padding: 16,
+        fontSize: 16,
+        borderWidth: 1,
+    },
+    submitBtn: {
+        borderRadius: 20,
+        padding: 20,
+        alignItems: 'center',
+        marginTop: 20,
+        ...Theme.shadows.md,
+    },
+    submitBtnText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    TextInput: {
+        borderRadius: 16,
+        padding: 16,
+        fontSize: 16,
+        borderWidth: 1,
+    },
+    ActivityIndicator: {
+        marginVertical: 20,
     },
 });

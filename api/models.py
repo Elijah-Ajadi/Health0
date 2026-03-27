@@ -180,14 +180,15 @@ class HealthRecord(models.Model):
         DOCUMENT = 'DOCUMENT', _('Document')
         IMAGE = 'IMAGE', _('Image')
         PDF = 'PDF', _('PDF')
+        EVENT = 'EVENT', _('Manual Health Event')
 
     patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='records')
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_records')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    file = models.FileField(upload_to='health_records/')
+    file = models.FileField(upload_to='health_records/', null=True, blank=True)
     record_type = models.CharField(max_length=10, choices=RecordType.choices)
-    is_verified = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
