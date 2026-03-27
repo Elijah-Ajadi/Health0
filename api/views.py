@@ -9,6 +9,15 @@ from .utils import log_audit, check_security_breach
 
 from django.db import IntegrityError, transaction
 
+class RootView(views.APIView):
+    permission_classes = [permissions.AllowAny]
+    def get(self, request):
+        return response.Response({
+            'status': 'HEALTH0_ACTIVE',
+            'environment': 'PROD' if not os.getenv('DEBUG') else 'DEV',
+            'version': '1.0.0'
+        })
+
 class RegisterView(views.APIView):
     permission_classes = [permissions.AllowAny]
 
