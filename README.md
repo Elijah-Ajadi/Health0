@@ -12,11 +12,6 @@ Health0 is a premium, high-density Electronic Medical Record (EMR) and Patient I
 - **Admin Dashboard**: [https://healthadmin-delta.vercel.app](https://healthadmin-delta.vercel.app)
 - **Production API**: [https://health0.onrender.com/api/](https://health0.onrender.com/api/)
 
-### 🔑 Demo Credentials
-| Role | Username | Password |
-| :--- | :--- | :--- |
-| **Patient** | `jane1` | `Kingpamies119@@` |
-| **Admin** | `foundation0` | `Kingpamies119@@` |
 
 ### 📶 USSD Offline Demo 
 To experience the offline medical ledger:
