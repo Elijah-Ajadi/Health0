@@ -1,4 +1,5 @@
 import os
+from django.conf import settings
 from rest_framework import status, views, response, permissions, generics, parsers
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
@@ -15,7 +16,7 @@ class RootView(views.APIView):
     def get(self, request):
         return response.Response({
             'status': 'HEALTH0_ACTIVE',
-            'environment': 'PROD' if not os.getenv('DEBUG') else 'DEV',
+            'environment': 'PROD' if not settings.DEBUG else 'DEV',
             'version': '1.0.0'
         })
 
