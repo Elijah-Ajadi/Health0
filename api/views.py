@@ -10,6 +10,10 @@ from .serializers import UserSerializer, PatientProfileSerializer, HospitalProfi
 from .utils import log_audit, check_security_breach
 
 from django.db import IntegrityError, transaction
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.http import HttpResponse
+from .ussd_logic import handle_ussd
 
 class RootView(views.APIView):
     permission_classes = [permissions.AllowAny]
@@ -363,4 +367,22 @@ class PatientAuditLogView(generics.ListAPIView):
         if self.request.user.role != User.Role.PATIENT:
             return AuditLog.objects.none()
         return AuditLog.objects.filter(patient__user=self.request.user).order_by('-timestamp')
+
+@method_decorator(csrf_exempt, name='dispatch')
+class USSDCallbackView(views.APIView):
+    """
+    Callback endpoint for Africa's Talking USSD.
+    Receives: sessionId, serviceCode, phoneNumber, text
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        phone_number = request.data.get('phoneNumber')
+        text = request.data.get('text', "")
+        
+        # Handle the logic
+        response_text = handle_ussd(phone_number, text)
+        
+        # Return plain text response (Africa's Talking requirement)
+        return HttpResponse(response_text, content_type='text/plain')
 

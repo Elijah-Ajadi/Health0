@@ -232,3 +232,17 @@ class DeliveryRequest(models.Model):
 
     def __str__(self):
         return f"{self.delivery_type} request for {self.patient}"
+
+class EmergencyToken(models.Model):
+    patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name='emergency_tokens')
+    token = models.CharField(max_length=6)
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        from django.utils import timezone
+        return not self.is_used and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"Token for {self.patient} - {self.token}"

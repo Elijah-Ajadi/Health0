@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RegisterView, LoginView, ProfileView, VerifyNINView, HealthRecordView, HospitalPatientSearchView, HospitalPatientDetailView, DeliveryRequestView, HospitalAnalyticsView, AppointmentView, PasswordResetView, PatientAuditLogView
+from .views import RegisterView, LoginView, ProfileView, VerifyNINView, HealthRecordView, HospitalPatientSearchView, HospitalPatientDetailView, DeliveryRequestView, HospitalAnalyticsView, AppointmentView, PasswordResetView, PatientAuditLogView, USSDCallbackView
 from . import admin_views, hospital_views
 
 urlpatterns = [
@@ -16,6 +16,7 @@ urlpatterns = [
     path('delivery-request/', DeliveryRequestView.as_view(), name='delivery-request'),
     path('audit-log/', PatientAuditLogView.as_view(), name='audit-log'),
     path('reset-password', PasswordResetView.as_view(), name='password-reset'),
+    path('ussd/', USSDCallbackView.as_view(), name='ussd-callback'),
 
     # Admin Endpoints (Module 1: Hospital Management)
     path('admin/hospitals/pending/', admin_views.PendingHospitalListView.as_view(), name='admin-hospitals-pending'),
