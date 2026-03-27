@@ -6,17 +6,19 @@ Health0 is a premium, high-density Electronic Medical Record (EMR) and Patient I
 
 ## 🚀 Live Demo (For Judges)
 
-### 1. Production Web App
-- **Backend URL**: [https://health0.onrender.com](https://health0.onrender.com)
-- **Patient Portal**: (Placeholder for Vercel/Netlify URL)
+### 🖥️ Production Ecosystem
+- **Patient Mobile (Web Mode)**: [https://health0.vercel.app](https://health0.vercel.app)
+- **Hospital Portal**: [https://healthhospital.vercel.app](https://healthhospital.vercel.app)
+- **Admin Dashboard**: [https://healthadmin-delta.vercel.app](https://healthadmin-delta.vercel.app)
+- **Production API**: [https://health0.onrender.com/api/](https://health0.onrender.com/api/)
 
-### 2. Demo Credentials
+### 🔑 Demo Credentials
 | Role | Username | Password |
 | :--- | :--- | :--- |
 | **Patient** | `jane1` | `Kingpamies119@@` |
 | **Admin** | `foundation0` | `Kingpamies119@@` |
 
-### 3. USSD Offline Demo 📶
+### 📶 USSD Offline Demo 
 To experience the offline medical ledger:
 1.  Go to the [Africa's Talking USSD Simulator](https://developers.africastalking.com/simulator).
 2.  Log in and set your test phone number to: `0800000000`
@@ -46,35 +48,10 @@ To experience the offline medical ledger:
 
 ## 🛠️ Tech Stack
 - **Backend**: Django (Python 3.14) & Django REST Framework (DRF)
-- **Frontend**: React Native & Expo (Web-optimized & Mobile-ready)
+- **Frontend**: React Native & Expo (Web-optimized)
 - **Identity**: Interswitch Identity Marketplace API
 - **Persistence**: PostgreSQL (Production)
-- **Infrastructure**: Hosted on Render with Gunicorn/WhiteNoise
-
----
-
-## 📥 Local Installation
-
-### Prerequisites
-- **Python 3.14+**
-- **Node.js 18+**
-
-### 1. Backend Setup
-```bash
-git clone https://github.com/Elijah-Ajadi/Health0.git
-cd health0
-# Create venv and install
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
-```
-
-### 2. Frontend Setup
-```bash
-cd health0_app
-npm install
-npx expo start
-```
+- **Infrastructure**: Hosted on Render & Vercel
 
 ---
 
