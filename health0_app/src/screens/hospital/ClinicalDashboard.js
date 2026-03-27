@@ -1,46 +1,100 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform, Modal, Pressable, Image } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { PageWrapper } from '../../components/PageWrapper';
 import { Theme } from '../../theme/Theme';
 import { useAuth } from '../../context/AuthContext';
+import { ThemeProvider, useTheme } from '../../context/ThemeContext';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const AlertItem = ({ type, message, time, severity }) => {
+    const { theme } = useTheme();
+    return (
+        <View style={[styles.alertItem, { borderBottomColor: theme.colors.background }]}>
+            <View style={[styles.severityDot, { backgroundColor: severity === 'high' ? theme.colors.error : theme.colors.warning }]} />
+            <View style={styles.alertMain}>
+                <Text style={[styles.alertType, { color: theme.colors.text }]}>{type}</Text>
+                <Text style={[styles.alertMessage, { color: theme.colors.textSecondary }]} numberOfLines={1}>{message}</Text>
+            </View>
+            <Text style={[styles.alertTime, { color: theme.colors.textSecondary }]}>{time}</Text>
+        </View>
+    );
+};
 
 export default function ClinicalDashboard({ navigation }) {
     const { user, logout } = useAuth();
+    const { theme, isDarkMode } = useTheme();
     const { width } = useWindowDimensions();
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+    // Adaptive Layout Logic
     const isWeb = width > 768;
+    const numColumns = width > 1000 ? 4 : width > 600 ? 2 : 1;
+    const spacing = 12;
+    const totalPadding = Theme.spacing.md * 2;
+    const cardWidth = (width - totalPadding - ((numColumns - 1) * spacing)) / numColumns;
 
-    const MetricCard = ({ label, value, icon, color }) => (
-        <View style={styles.metricCard}>
-            <View style={[styles.metricIcon, { backgroundColor: color + '15' }]}>
-                <MaterialCommunityIcons name={icon} size={24} color={color} />
-            </View>
-            <View>
-                <Text style={styles.metricValue}>{value}</Text>
-                <Text style={styles.metricLabel}>{label}</Text>
-            </View>
-        </View>
-    );
+    const MetricCard = ({ label, value, icon, color, delay = 0 }) => {
+        const scale = useSharedValue(1);
+        const animatedStyle = useAnimatedStyle(() => ({
+            transform: [{ scale: scale.value }]
+        }));
 
-    const AlertItem = ({ type, message, time, severity }) => (
-        <View style={styles.alertItem}>
-            <View style={[styles.severityDot, { backgroundColor: severity === 'high' ? Theme.colors.error : Theme.colors.warning }]} />
-            <View style={styles.alertMain}>
-                <Text style={styles.alertType}>{type}</Text>
-                <Text style={styles.alertMessage} numberOfLines={1}>{message}</Text>
-            </View>
-            <Text style={styles.alertTime}>{time}</Text>
-        </View>
-    );
+        const handlePressIn = () => scale.value = withSpring(0.97);
+        const handlePressOut = () => scale.value = withSpring(1);
 
-    const Shortcut = ({ icon, label, bg }) => (
-        <TouchableOpacity style={[styles.shortcut, { backgroundColor: bg }]}>
-            <MaterialIcons name={icon} size={24} color="white" />
-            <Text style={styles.shortcutLabel}>{label}</Text>
-        </TouchableOpacity>
-    );
+        return (
+            <AnimatedPressable
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                entering={FadeInDown.delay(delay).springify()}
+                style={[
+                    styles.metricCard,
+                    {
+                        width: numColumns === 1 ? '100%' : cardWidth,
+                        backgroundColor: theme.colors.card,
+                        borderColor: theme.colors.outline
+                    },
+                    animatedStyle
+                ]}
+            >
+                <View style={[styles.metricIcon, { backgroundColor: color + '15' }]}>
+                    <MaterialCommunityIcons name={icon} size={28} color={color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={[styles.metricValue, { color }]}>{value}</Text>
+                    <Text style={[styles.metricLabel, { color: theme.colors.textSecondary }]}>{label}</Text>
+                </View>
+            </AnimatedPressable>
+        );
+    };
+
+    const Shortcut = ({ icon, label, bg, delay = 0 }) => {
+        const scale = useSharedValue(1);
+        const pressStyle = useAnimatedStyle(() => ({
+            transform: [{ scale: scale.value }]
+        }));
+
+        const handlePressIn = () => scale.value = withSpring(0.95);
+        const handlePressOut = () => scale.value = withSpring(1);
+
+        return (
+            <AnimatedPressable
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                entering={FadeInUp.delay(delay + 400).springify()}
+                style={[styles.shortcut, { backgroundColor: bg }, pressStyle]}
+            >
+                <View style={styles.shortcutIconRing}>
+                    <MaterialIcons name={icon} size={32} color="white" />
+                </View>
+                <Text style={styles.shortcutLabel}>{label}</Text>
+            </AnimatedPressable>
+        );
+    };
 
     const renderProfileMenu = () => (
         <Modal
@@ -53,10 +107,14 @@ export default function ClinicalDashboard({ navigation }) {
                 style={styles.modalOverlay}
                 onPress={() => setShowProfileMenu(false)}
             >
-                <View style={[styles.profileMenu, isWeb && styles.webProfileMenu]}>
-                    <View style={styles.menuHeader}>
-                        <Text style={styles.menuUserName}>{user?.first_name} {user?.last_name}</Text>
-                        <Text style={styles.menuUserEmail}>{user?.email}</Text>
+                <View style={[
+                    styles.profileMenu,
+                    isWeb && styles.webProfileMenu,
+                    { backgroundColor: theme.colors.card }
+                ]}>
+                    <View style={[styles.menuHeader, { borderBottomColor: theme.colors.outline }]}>
+                        <Text style={[styles.menuUserName, { color: theme.colors.text }]}>{user?.first_name} {user?.last_name}</Text>
+                        <Text style={[styles.menuUserEmail, { color: theme.colors.textSecondary }]}>{user?.email}</Text>
                     </View>
 
                     <TouchableOpacity
@@ -66,16 +124,16 @@ export default function ClinicalDashboard({ navigation }) {
                             navigation.navigate('Profile');
                         }}
                     >
-                        <MaterialIcons name="person-outline" size={22} color={Theme.colors.clinical.primary} />
-                        <Text style={styles.menuItemText}>Edit Profile</Text>
+                        <MaterialIcons name="person-outline" size={22} color={theme.colors.clinical.primary} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Edit Profile</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.menuItem}>
-                        <MaterialIcons name="settings" size={22} color={Theme.colors.textSecondary} />
-                        <Text style={styles.menuItemText}>Account Settings</Text>
+                        <MaterialIcons name="settings" size={22} color={theme.colors.textSecondary} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Account Settings</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.menuDivider} />
+                    <View style={[styles.menuDivider, { backgroundColor: theme.colors.outline }]} />
 
                     <TouchableOpacity
                         style={styles.menuItem}
@@ -84,8 +142,8 @@ export default function ClinicalDashboard({ navigation }) {
                             logout();
                         }}
                     >
-                        <MaterialIcons name="logout" size={22} color={Theme.colors.error} />
-                        <Text style={[styles.menuItemText, { color: Theme.colors.error }]}>Logout</Text>
+                        <MaterialIcons name="logout" size={22} color={theme.colors.error} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.error }]}>Logout</Text>
                     </TouchableOpacity>
                 </View>
             </Pressable>
@@ -95,65 +153,84 @@ export default function ClinicalDashboard({ navigation }) {
     return (
         <PageWrapper
             header={
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <Text style={styles.hospitalName}>LAGOS GENERAL HOSPITAL</Text>
-                        <View style={styles.deptBadge}>
+                <Animated.View
+                    entering={FadeInDown.duration(800)}
+                    style={[
+                        styles.header,
+                        {
+                            backgroundColor: theme.colors.card,
+                            borderBottomColor: theme.colors.outline
+                        }
+                    ]}
+                >
+                    <View style={[styles.headerLeft, { flex: 1 }]}>
+                        <Text style={[styles.hospitalName, { color: theme.colors.text }]} numberOfLines={1}>LAGOS GENERAL HOSPITAL</Text>
+                        <View style={[styles.deptBadge, { backgroundColor: theme.colors.clinical.bg }]}>
                             <Text style={styles.deptText}>CARDIOLOGY DEPT</Text>
                         </View>
                     </View>
                     <View style={styles.headerRight}>
                         <TouchableOpacity
-                            style={styles.statusToggle}
+                            style={[styles.statusToggle, { backgroundColor: theme.colors.background }]}
                             onPress={() => setShowProfileMenu(true)}
                         >
                             <View style={styles.onlineDot} />
-                            <Text style={styles.statusLabel}>
+                            <Text style={[styles.statusLabel, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                                 {user?.first_name ? `DR. ${user.first_name.toUpperCase()} (ON DUTY)` : 'DR. ADEMOLA (OFFLINE)'}
                             </Text>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.profileBtn}
+                            onPress={() => setShowProfileMenu(true)}
+                        >
+                            <Image
+                                source={{ uri: `https://i.pravatar.cc/150?u=${user?.id || 'health0_doc'}` }}
+                                style={styles.profileThumbnail}
+                            />
+                        </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
             }
             contentContainerStyle={styles.container}
         >
             <View style={isWeb ? styles.webLayout : styles.mobileLayout}>
                 {/* Main Content Area */}
                 <View style={styles.mainContent}>
-                    <Text style={styles.sectionTitle}>CLINICAL COMMAND CENTER</Text>
+                    {renderProfileMenu()}
+                    <Animated.Text entering={FadeInDown.delay(100)} style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>CLINICAL COMMAND CENTER</Animated.Text>
 
                     {/* Traffic Grid */}
                     <View style={styles.metricGrid}>
-                        <MetricCard label="Admissions Today" value="12" icon="hospital-box" color={Theme.colors.clinical.primary} />
-                        <MetricCard label="Appointments" value="08" icon="calendar-clock" color={Theme.colors.secondary} />
-                        <MetricCard label="Pending Labs" value="24" icon="flask-outline" color={Theme.colors.warning} />
-                        <MetricCard label="Critical Alerts" value="03" icon="alert-decagram" color={Theme.colors.error} />
+                        <MetricCard label="Admissions Today" value="12" icon="hospital-box" color={theme.colors.clinical.primary} delay={200} />
+                        <MetricCard label="Appointments" value="08" icon="calendar-clock" color={theme.colors.secondary} delay={300} />
+                        <MetricCard label="Pending Labs" value="24" icon="flask-outline" color={theme.colors.warning} delay={400} />
+                        <MetricCard label="Critical Alerts" value="03" icon="alert-decagram" color={theme.colors.error} delay={500} />
                     </View>
 
                     {/* Quick Shortcuts */}
                     <View style={styles.shortcutRow}>
-                        <Shortcut icon="add-circle" label="New Consultation" bg={Theme.colors.clinical.primary} />
-                        <Shortcut icon="emergency" label="Emergency Reg" bg={Theme.colors.error} />
-                        <Shortcut icon="history-edu" label="E-Prescription" bg={Theme.colors.secondary} />
+                        <Shortcut icon="add-circle" label="New Consultation" bg={theme.colors.clinical.primary} delay={200} />
+                        <Shortcut icon="emergency" label="Emergency Reg" bg={theme.colors.error} delay={300} />
+                        <Shortcut icon="history-edu" label="E-Prescription" bg={theme.colors.secondary} delay={400} />
                     </View>
 
                     {/* Patient Queue Placeholder */}
-                    <View style={styles.queueSection}>
+                    <Animated.View entering={FadeInUp.delay(600).springify()} style={[styles.queueSection, { backgroundColor: theme.colors.card }]}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.subTitle}>ACTIVE PATIENT QUEUE</Text>
-                            <TouchableOpacity><Text style={styles.viewFull}>View All</Text></TouchableOpacity>
+                            <Text style={[styles.subTitle, { color: theme.colors.text }]}>ACTIVE PATIENT QUEUE</Text>
+                            <TouchableOpacity><Text style={[styles.viewFull, { color: theme.colors.clinical.primary }]}>View All</Text></TouchableOpacity>
                         </View>
                         <View style={styles.emptyQueue}>
-                            <MaterialCommunityIcons name="account-group" size={48} color={Theme.colors.outline} />
-                            <Text style={styles.emptyText}>All patients have been seen. Waiting for new arrivals.</Text>
+                            <MaterialCommunityIcons name="account-group" size={48} color={theme.colors.outline} />
+                            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>All patients have been seen. Waiting for new arrivals.</Text>
                         </View>
-                    </View>
+                    </Animated.View>
                 </View>
 
                 {/* Sidebar / Alerts Column */}
                 <View style={isWeb ? styles.sidebar : styles.mobileAlerts}>
-                    <Text style={styles.sectionTitle}>CRITICAL ALERTS</Text>
-                    <View style={styles.alertList}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>CRITICAL ALERTS</Text>
+                    <View style={[styles.alertList, { backgroundColor: theme.colors.card }]}>
                         <AlertItem
                             type="Abnormal Labs"
                             message="Patient ID: #882 has critical high glucose."
@@ -174,10 +251,16 @@ export default function ClinicalDashboard({ navigation }) {
                         />
                     </View>
 
-                    <View style={styles.complianceCard}>
-                        <MaterialIcons name="security" size={20} color={Theme.colors.success} />
-                        <Text style={styles.complianceText}>NDPA COMPLIANCE ACTIVE</Text>
-                        <Text style={styles.complianceSub}>All interactions are being logged.</Text>
+                    <View style={[
+                        styles.complianceCard,
+                        {
+                            backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.1)' : '#f0fdf4',
+                            borderColor: theme.colors.success + '40'
+                        }
+                    ]}>
+                        <MaterialIcons name="security" size={20} color={theme.colors.success} />
+                        <Text style={[styles.complianceText, { color: theme.colors.success }]}>NDPA COMPLIANCE ACTIVE</Text>
+                        <Text style={[styles.complianceSub, { color: theme.colors.textSecondary }]}>All interactions are being logged.</Text>
                     </View>
                 </View>
             </View>
@@ -196,11 +279,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: Theme.spacing.lg,
+        paddingHorizontal: Platform.OS === 'web' ? Theme.spacing.lg : Theme.spacing.md,
         paddingVertical: Theme.spacing.md,
         backgroundColor: 'white',
         borderBottomWidth: 1,
         borderBottomColor: Theme.colors.outline,
+        gap: 8,
     },
     hospitalName: {
         fontSize: 16,
@@ -229,6 +313,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: Theme.borderRadius.full,
+        flexShrink: 1,
     },
     onlineDot: {
         width: 8,
@@ -240,6 +325,20 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
         color: Theme.colors.textSecondary,
+    },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    profileBtn: {
+        padding: 2,
+    },
+    profileThumbnail: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Theme.colors.outline,
     },
     webLayout: {
         flexDirection: 'row',
@@ -269,17 +368,13 @@ const styles = StyleSheet.create({
         marginBottom: Theme.spacing.xl,
     },
     metricCard: {
-        width: '48%',
         backgroundColor: 'white',
         padding: Theme.spacing.lg,
         borderRadius: Theme.borderRadius.xl,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 16,
-        ...Platform.select({
-            web: { boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-            default: Theme.shadows.sm,
-        })
+        ...Theme.shadows.sm,
     },
     metricIcon: {
         width: 50,
@@ -291,7 +386,6 @@ const styles = StyleSheet.create({
     metricValue: {
         fontSize: 24,
         fontWeight: '900',
-        color: Theme.colors.text,
     },
     metricLabel: {
         fontSize: 11,
@@ -305,20 +399,27 @@ const styles = StyleSheet.create({
     },
     shortcut: {
         flex: 1,
-        height: 100,
+        height: 110,
         borderRadius: Theme.borderRadius.xl,
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
-        ...Platform.select({
-            web: { boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
-            default: Theme.shadows.md,
-        })
+        gap: 10,
+        ...Theme.shadows.md,
+    },
+    shortcutIconRing: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
     shortcutLabel: {
         color: 'white',
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '900',
         textAlign: 'center',
         paddingHorizontal: 8,
     },

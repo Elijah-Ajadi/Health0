@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -9,7 +9,7 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const res = await axios.post('http://localhost:8000/api/login/', { username, password });
+            const res = await api.post('/login/', { username, password });
             const { token, user } = res.data;
 
             if (user.role === 'ADMIN' || user.is_staff_admin || user.is_superuser) {

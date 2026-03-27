@@ -84,16 +84,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         padding: Theme.spacing.md,
         borderRadius: Theme.borderRadius.xl,
-        ...Platform.select({
-            web: { boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-            default: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 3,
-                elevation: 2, // For Android
-            },
-        })
+        ...Theme.shadows.sm,
     },
     metricLabel: {
         fontSize: 9,
@@ -143,16 +134,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         borderRadius: Theme.borderRadius.xl,
         overflow: 'hidden',
-        ...Platform.select({
-            web: { boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
-            default: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 6,
-                elevation: 5, // For Android
-            },
-        })
+        ...Theme.shadows.md,
     },
     chartGradient: {
         flex: 1,

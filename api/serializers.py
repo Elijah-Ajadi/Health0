@@ -50,7 +50,7 @@ class HealthRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = HealthRecord
         fields = '__all__'
-        read_only_fields = ('uploaded_by', 'is_verified')
+        read_only_fields = ('patient', 'uploaded_by', 'is_verified')
 
 class AppointmentSerializer(serializers.ModelSerializer):
     class Meta:

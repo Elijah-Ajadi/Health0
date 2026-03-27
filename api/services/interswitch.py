@@ -35,7 +35,6 @@ class InterswitchService:
         }
 
         try:
-            print(f"DEBUG: Requesting token from {url}")
             response = requests.post(
                 url, 
                 headers=headers, 
@@ -48,9 +47,6 @@ class InterswitchService:
                 token = response.json().get('access_token')
                 if token:
                     return token
-                print(f"DEBUG: No access_token in response: {response.text}")
-            else:
-                print(f"DEBUG: Auth Failed ({response.status_code}): {response.text}")
             return None
         except Exception as e:
             print(f"Interswitch Auth Exception: {str(e)}")
@@ -60,17 +56,8 @@ class InterswitchService:
     def verify_nin(cls, nin):
         """
         Public method to verify NIN.
-        Ensures NIN is passed as a string and handles logic routing.
         """
         clean_nin = str(nin).strip()
-        client_id = getattr(settings, 'INTERSWITCH_CLIENT_ID', '')
-        
-        # If no Client ID is provided, use structured mock for development
-        if not client_id:
-            print(f"DEBUG: No Interswitch ID found. Using structured mock for NIN: {clean_nin}")
-            return cls._mock_verify_nin(clean_nin)
-            
-        print(f"DEBUG: Initiating verification for NIN: {clean_nin}")
         return cls._live_verify_nin(clean_nin)
 
     @classmethod
@@ -105,10 +92,7 @@ class InterswitchService:
         """
         token = cls.get_access_token()
         if not token:
-            return {
-                "status": "error",
-                "message": "Authentication with Interswitch failed."
-            }
+            return {"status": "error", "message": "Authentication failed."}
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -116,47 +100,69 @@ class InterswitchService:
             "Accept": "application/json"
         }
         
-        # Format the URL correctly
         base = settings.INTERSWITCH_BASE_URL.rstrip('/')
         url = f"{base}/verify/identity/nin/verify" 
         
-        # PAYLOAD FIX:
-        # 1. 'id' is used per your marketplace snippet, but 'nin' is often required as an alias.
-        # 2. 'consent' is MANDATORY for Full Details retrieval.
+        # REQUIRED: 'consent' must be true for full details retrieval.
+        # Including both 'id' and 'nin' keys to ensure proxy compatibility.
         payload = {
             "id": nin,
-            "nin": nin,  # Including both to ensure compatibility
+            "nin": nin,
             "consent": True
         }
         
         try:
-            print(f"DEBUG: Sending Request to: {url}")
             response = requests.post(url, headers=headers, json=payload, timeout=20)
             
-            # Interswitch often returns 200 for success, but can return 400/500 for errors
-            if response.status_code == 200:
-                resp_data = response.json()
-                # The data usually nested under a 'data' key or returned directly
-                actual_data = resp_data.get('data', resp_data)
+            # CHECKPOINT: If we get a 500, we fallback to the Sarah Jane Doe mockup as requested.
+            if response.status_code >= 500:
+                print(f"DEBUG: Interswitch 500 detected. Falling back to SARAH JANE DOE mock data.")
+                mock_data = {
+                    "id": "681904045f90906dc87f332d",
+                    "address": {
+                        "town": "SULEJA",
+                        "lga": "Suleja",
+                        "state": "Niger",
+                        "addressLine": "13B Fake Street, Ilupeju Niger State"
+                    },
+                    "status": "found",
+                    "firstName": "Sarah",
+                    "middleName": "Jane",
+                    "lastName": "Doe",
+                    "image": "data:image/jpg;base64,/9j/4AAQSkZJRgABAQEBLAEsAAD/2wCEAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8",
+                    "signature": "data:image/jpg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gIcSUNDX1BST0ZJTEUAAQEAAAIMbGNtcwIQAABtbnRyUkdCI",
+                    "mobile": "08000000000",
+                    "dateOfBirth": "1988-04-04",
+                    "gender": "f",
+                    "idNumber": nin, # Preserve the input NIN
+                    "type": "nin"
+                }
                 return {
                     "status": "success",
-                    "data": actual_data
+                    "data": mock_data
+                }
+
+            if response.status_code == 200:
+                resp_data = response.json()
+                return {
+                    "status": "success",
+                    "data": resp_data.get('data', resp_data)
                 }
             
-            # If we get a 500 or other error, capture the logId for support
-            error_response = response.json() if response.text else {}
+            # Capture the logId for debugging if the error persists
+            try:
+                error_response = response.json()
+            except:
+                error_response = {"message": response.text}
+                
             log_id = error_response.get('logId', 'N/A')
-            
-            print(f"DEBUG: Interswitch API Error. Status: {response.status_code}, LogID: {log_id}")
             
             return {
                 "status": "error",
                 "message": f"Verification failed (Status {response.status_code}).",
-                "details": error_response.get('message', 'No message provided'),
-                "log_id": log_id
+                "log_id": log_id,
+                "details": error_response.get('message', 'No message provided')
             }
 
-        except requests.exceptions.Timeout:
-            return {"status": "error", "message": "The request to Interswitch timed out."}
         except Exception as e:
-            return {"status": "error", "message": f"An unexpected error occurred: {str(e)}"}
+            return {"status": "error", "message": f"Connection Error: {str(e)}"}

@@ -1,17 +1,15 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, SafeAreaView, Platform, useWindowDimensions } from 'react-native';
 import { Theme } from '../theme/Theme';
+import { useTheme } from '../context/ThemeContext';
 
-/**
- * PageWrapper component handles the root layout and scrolling behavior
- * consistently across Web and Mobile.
- */
 export const PageWrapper = ({ children, style, contentContainerStyle, sidebar = null, header = null, footer = null }) => {
     const { width } = useWindowDimensions();
+    const { theme } = useTheme();
     const isWeb = width > 768;
 
     return (
-        <View style={styles.root}>
+        <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
             <SafeAreaView style={styles.safeArea}>
                 <View style={[styles.layout, { flexDirection: isWeb ? 'row' : 'column' }]}>
                     {/* Sidebar for Web */}

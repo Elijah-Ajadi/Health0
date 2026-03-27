@@ -41,6 +41,12 @@ Thumbs.db
 .gemini/
 .agents/
 brain/
-*.webp
-*.png
-*.mp4
+
+# Media (Ignore large media but allow assets)
+# *.webp
+# *.png
+# *.mp4
+!/health0_app/assets/*.png
+!/**/favicon.png
+!/**/icon.png
+!/**/splash-icon.png

@@ -1,23 +1,54 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PageWrapper } from '../../components/PageWrapper';
 import { Theme } from '../../theme/Theme';
+import { useAuth } from '../../context/AuthContext';
+import Config from '../../config';
 
-export default function PatientSearch() {
+export default function PatientSearch({ navigation }) {
+    const { token } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
 
-    const SearchResult = ({ name, nin, status }) => (
-        <TouchableOpacity style={styles.resultCard}>
+    const handleSearch = async () => {
+        if (!searchQuery.trim()) return;
+        setLoading(true);
+        setHasSearched(true);
+        try {
+            const response = await fetch(`${Config.BASE_URL}/api/hospital/search/?q=${searchQuery}`, {
+                headers: {
+                    'Authorization': `Token ${token}`,
+                },
+            });
+            const data = await response.json();
+            if (response.ok) {
+                setResults(data);
+            } else {
+                console.error('Search failed:', data);
+            }
+        } catch (error) {
+            console.error('Network error during search:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const SearchResult = ({ item }) => (
+        <TouchableOpacity
+            style={styles.resultCard}
+            onPress={() => navigation.navigate('Clinical', { patientId: item.id })}
+        >
             <View style={styles.resultInfo}>
-                <Text style={styles.resultName}>{name}</Text>
-                <Text style={styles.resultNin}>NIN: {nin}</Text>
-                <View style={[styles.kycBadge, { backgroundColor: status === 'verified' ? Theme.colors.success + '15' : Theme.colors.warning + '15' }]}>
-                    <MaterialIcons name={status === 'verified' ? 'verified' : 'history'} size={12} color={status === 'verified' ? Theme.colors.success : Theme.colors.warning} />
-                    <Text style={[styles.kycText, { color: status === 'verified' ? Theme.colors.success : Theme.colors.warning }]}>
-                        {status === 'verified' ? 'INTERSWITCH KYC VERIFIED' : 'PENDING VERIFICATION'}
+                <Text style={styles.resultName}>{item.user.first_name} {item.user.last_name}</Text>
+                <Text style={styles.resultNin}>NIN: {item.nin}</Text>
+                <View style={[styles.kycBadge, { backgroundColor: Theme.colors.success + '15' }]}>
+                    <MaterialIcons name="verified" size={12} color={Theme.colors.success} />
+                    <Text style={[styles.kycText, { color: Theme.colors.success }]}>
+                        INTERSWITCH KYC VERIFIED
                     </Text>
                 </View>
             </View>
@@ -39,29 +70,35 @@ export default function PatientSearch() {
                 <View style={styles.searchBar}>
                     <MaterialIcons name="search" size={24} color={Theme.colors.textSecondary} />
                     <TextInput
-                        placeholder="Enter NIN, Phone or Health0 ID"
+                        placeholder="Enter Name or NIN"
                         style={styles.input}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
+                        onSubmitEditing={handleSearch}
                     />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setIsSearching(true)} style={styles.goButton}>
+                    {searchQuery.length > 0 && !loading && (
+                        <TouchableOpacity onPress={handleSearch} style={styles.goButton}>
                             <Text style={styles.goText}>PULL RECORDS</Text>
                         </TouchableOpacity>
                     )}
+                    {loading && <ActivityIndicator color={Theme.colors.clinical.primary} />}
                 </View>
                 <View style={styles.filterRow}>
                     <Text style={styles.filterText}>Quick Filters:</Text>
                     <TouchableOpacity style={styles.chip}><Text style={styles.chipText}>NIN</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.chip}><Text style={styles.chipText}>Phone</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.chip}><Text style={styles.chipText}>Emergency Code</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.chip}><Text style={styles.chipText}>Name</Text></TouchableOpacity>
                 </View>
             </View>
 
-            {isSearching ? (
+            {hasSearched ? (
                 <View style={styles.resultsSection}>
-                    <Text style={styles.sectionTitle}>1 MATCH FOUND IN CENTRAL REGISTRY</Text>
-                    <SearchResult name="Olawale Benjamin" nin="1234****901" status="verified" />
+                    <Text style={styles.sectionTitle}>{results.length} MATCH{results.length !== 1 ? 'ES' : ''} FOUND</Text>
+                    {results.map((item) => (
+                        <SearchResult key={item.id} item={item} />
+                    ))}
+                    {results.length === 0 && !loading && (
+                        <Text style={styles.noResults}>No patients found matching "{searchQuery}"</Text>
+                    )}
                 </View>
             ) : (
                 <View style={styles.emptyState}>
@@ -69,7 +106,7 @@ export default function PatientSearch() {
                         <MaterialCommunityIcons name="card-search" size={64} color={Theme.colors.outline} />
                     </View>
                     <Text style={styles.emptyTitle}>Secure Patient Lookup</Text>
-                    <Text style={styles.emptyDesc}>Enter a patient's NIN to retrieve their unified clinical history from the national Health0 ledger.</Text>
+                    <Text style={styles.emptyDesc}>Enter a patient's Name or NIN to retrieve their verified clinical history from the national Health0 ecosystem.</Text>
                 </View>
             )}
 
@@ -211,6 +248,7 @@ const styles = StyleSheet.create({
         padding: Theme.spacing.lg,
         borderRadius: Theme.borderRadius.xl,
         justifyContent: 'space-between',
+        marginBottom: 12,
         ...Platform.select({
             web: { boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
             default: Theme.shadows.sm,

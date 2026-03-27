@@ -90,7 +90,7 @@ const Hospitals = () => {
                                     <div key={doc.field} style={{ padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem', textAlign: 'center', border: '1px solid #e2e8f0' }}>
                                         <p style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{doc.label}</p>
                                         {selectedHospital[doc.field] ? (
-                                            <a href={`http://localhost:8000${selectedHospital[doc.field]}`} target="_blank" className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>View PDF</a>
+                                            <a href={`https://health0.onrender.com${selectedHospital[doc.field]}`} target="_blank" className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}>View PDF</a>
                                         ) : (
                                             <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Not Uploaded</span>
                                         )}

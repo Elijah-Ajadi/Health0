@@ -112,4 +112,4 @@ cd health0
 - All clinical data is served over authenticated endpoints requiring valid DRF Tokens.
 
 ## 📄 License
-MIT License - Copyright (c) 2026 Health0 Team.
+MIT License - Copyright (c) 2026 Foundation Team for Enyata Hackathon 2026.
