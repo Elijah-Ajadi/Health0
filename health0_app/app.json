@@ -21,7 +21,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.health0.patientapp"
+      "package": "com.health0.patientapp",
+      "newArchEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
