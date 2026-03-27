@@ -1,44 +1,44 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, SafeAreaView, Platform, useWindowDimensions } from 'react-native';
+import { View, ScrollView, StyleSheet, Platform, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../theme/Theme';
 import { useTheme } from '../context/ThemeContext';
 
 export const PageWrapper = ({ children, style, contentContainerStyle, sidebar = null, header = null, footer = null }) => {
     const { width } = useWindowDimensions();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
     const isWeb = width > 768;
 
     return (
         <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
-            <SafeAreaView style={styles.safeArea}>
-                <View style={[styles.layout, { flexDirection: isWeb ? 'row' : 'column' }]}>
-                    {/* Sidebar for Web */}
-                    {isWeb && sidebar}
+            <View style={[styles.layout, { flexDirection: isWeb ? 'row' : 'column' }]}>
+                {/* Sidebar for Web */}
+                {isWeb && sidebar}
 
-                    <View style={styles.mainContainer}>
-                        {/* Header */}
-                        {header}
+                <View style={[styles.mainContainer, !isWeb && { paddingTop: insets.top }]}>
+                    {/* Header */}
+                    {header}
 
-                        <View style={styles.scrollWrapper}>
-                            <ScrollView
-                                style={[styles.scrollView, style]}
-                                contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
-                                showsVerticalScrollIndicator={true}
-                                scrollEnabled={true}
-                            >
-                                <View style={styles.contentInner}>
-                                    {children}
-                                </View>
-                                {/* Desktop Spacer */}
-                                {isWeb && <View style={{ height: 100 }} />}
-                            </ScrollView>
-                        </View>
-
-                        {/* Mobile Footer/Tabs */}
-                        {!isWeb && footer}
+                    <View style={styles.scrollWrapper}>
+                        <ScrollView
+                            style={[styles.scrollView, style]}
+                            contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
+                            showsVerticalScrollIndicator={true}
+                            scrollEnabled={true}
+                        >
+                            <View style={styles.contentInner}>
+                                {children}
+                            </View>
+                            {/* Desktop Spacer */}
+                            {isWeb && <View style={{ height: 100 }} />}
+                        </ScrollView>
                     </View>
+
+                    {/* Mobile Footer/Tabs */}
+                    {!isWeb && footer}
                 </View>
-            </SafeAreaView>
+            </View>
         </View>
     );
 };

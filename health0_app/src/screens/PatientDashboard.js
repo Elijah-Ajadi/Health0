@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, useWindowDimensions, Platform, ScrollView, Modal, Pressable, Linking, RefreshControl, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, FadeIn, FadeOut, Layout, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +16,7 @@ export default function PatientDashboard({ navigation }) {
     const { user, token, logout } = useAuth();
     const { theme, isDarkMode } = useTheme();
     const { width } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
     const [showProfileMenu, setShowProfileMenu] = useState(false);
 
     // Dynamic Data State
@@ -405,7 +407,7 @@ export default function PatientDashboard({ navigation }) {
             >
                 <Animated.View
                     entering={FadeIn.duration(200)}
-                    style={[styles.profileMenu, isWeb && styles.webProfileMenu, { backgroundColor: theme.colors.surface }]}
+                    style={[styles.profileMenu, isWeb && styles.webProfileMenu, { backgroundColor: theme.colors.surface, marginTop: insets.top + (isWeb ? 70 : 10) }]}
                 >
                     <View style={[styles.menuHeader, { borderBottomColor: theme.colors.outline }]}>
                         <Text style={[styles.menuUserName, { color: theme.colors.text }]}>
