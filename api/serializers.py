@@ -13,11 +13,17 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             profile = obj.patient_profile
             return {
+                'id': profile.id,
                 'nin': profile.nin,
                 'phone_number': profile.phone_number,
                 'address': profile.address,
                 'dob': profile.dob,
-                'gender': profile.gender
+                'gender': profile.gender,
+                'blood_group': profile.blood_group,
+                'genotype': profile.genotype,
+                'allergies': profile.allergies,
+                'confirmed_health_conditions': profile.confirmed_health_conditions,
+                'nin_verified': profile.nin_verified
             }
         except:
             return None

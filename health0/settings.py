@@ -158,3 +158,4 @@ INTERSWITCH_CLIENT_SECRET = os.getenv('INTERSWITCH_CLIENT_SECRET', '').strip()
 INTERSWITCH_BASE_URL = os.getenv('INTERSWITCH_BASE_URL', 'https://api-marketplace-routing.k8.isw.la/marketplace-routing/api/v1/').strip()
 INTERSWITCH_OAUTH_URL = os.getenv('INTERSWITCH_OAUTH_URL', 'https://qa.interswitchng.com/passport/oauth/token').strip()
 
+

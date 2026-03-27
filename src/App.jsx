@@ -14,11 +14,19 @@ import HospitalDashboard from './pages/HospitalDashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import RecordDetail from './pages/RecordDetail'
 import RecordUpload from './pages/RecordUpload'
+import RecordsList from './pages/RecordsList'
+import ProfileSettings from './pages/ProfileSettings'
 import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
+import HospitalPatients from './pages/HospitalPatients'
+import HospitalRecords from './pages/HospitalRecords'
+import HospitalPatientDetail from './pages/HospitalPatientDetail'
+import ErrorPage from './pages/ErrorPage'
+import NotFoundPage from './pages/NotFoundPage'
 
 // Context
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
 
 const AppContent = () => {
     const { user, loading } = useAuth()
@@ -51,14 +59,25 @@ const AppContent = () => {
                         <Route path="/login" element={<Login />} />
                         <Route path="/patient/register" element={<PatientRegistration />} />
                         <Route path="/hospital/register" element={<HospitalRegistration />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
+                            {/* 404 Fallback */}
+                            <Route path="*" element={<NotFoundPage />} />
                     </Routes>
-                ) : (
+                ) : user ? (
                     <AppShell>
                         <Routes location={location} key="protected">
                             <Route path="/dashboard" element={
                                 <ProtectedRoute>
                                     <DashboardSwitcher />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/records" element={
+                                <ProtectedRoute allowedRoles={['PATIENT', 'HOSPITAL']}>
+                                    <RecordsList />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/settings" element={
+                                <ProtectedRoute>
+                                    <ProfileSettings />
                                 </ProtectedRoute>
                             } />
                             <Route path="/record/:id" element={
@@ -71,10 +90,29 @@ const AppContent = () => {
                                     <RecordUpload />
                                 </ProtectedRoute>
                             } />
-                            {/* Fallback for authenticated users */}
-                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                            {/* Hospital specific pages */}
+                            <Route path="/hospital/patients" element={
+                                <ProtectedRoute allowedRoles={['HOSPITAL']}>
+                                    <HospitalPatients />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/hospital/records" element={
+                                <ProtectedRoute allowedRoles={['HOSPITAL']}>
+                                    <HospitalRecords />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/hospital/patient/:id" element={
+                                <ProtectedRoute allowedRoles={['HOSPITAL']}>
+                                    <HospitalPatientDetail />
+                                </ProtectedRoute>
+                            } />
+                            {/* 404 Fallback */}
+                                {/* 404 Fallback */}
+                            <Route path="*" element={<NotFoundPage />} />
                         </Routes>
                     </AppShell>
+                ) : (
+                    <Navigate to="/login" replace />
                 )}
             </AnimatePresence>
         </div>
@@ -104,7 +142,9 @@ function App() {
             }}
         >
             <AuthProvider>
-                <AppContent />
+                <ToastProvider>
+                    <AppContent />
+                </ToastProvider>
             </AuthProvider>
         </Router>
     )

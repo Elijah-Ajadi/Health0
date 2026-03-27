@@ -62,10 +62,41 @@ class InterswitchService:
         Public method to verify NIN.
         Ensures NIN is passed as a string and handles logic routing.
         """
-        # Clean the input (remove spaces if any)
         clean_nin = str(nin).strip()
+        client_id = getattr(settings, 'INTERSWITCH_CLIENT_ID', '')
+        
+        # If no Client ID is provided, use structured mock for development
+        if not client_id:
+            print(f"DEBUG: No Interswitch ID found. Using structured mock for NIN: {clean_nin}")
+            return cls._mock_verify_nin(clean_nin)
+            
         print(f"DEBUG: Initiating verification for NIN: {clean_nin}")
         return cls._live_verify_nin(clean_nin)
+
+    @classmethod
+    def _mock_verify_nin(cls, nin):
+        """
+        Structured mock for development/testing when API keys are missing.
+        """
+        # Success case for specific test NINs or any 11-digit number
+        if len(nin) == 11:
+            return {
+                "status": "success",
+                "data": {
+                    "firstName": "Jane",
+                    "lastName": "Doe",
+                    "middleName": "Health",
+                    "gender": "Female",
+                    "dateOfBirth": "1994-05-12",
+                    "nin": nin,
+                    "phone": "08012345678",
+                    "signature": "mock_sig_123"
+                }
+            }
+        return {
+            "status": "error",
+            "message": "Invalid NIN format. Must be 11 digits."
+        }
 
     @classmethod
     def _live_verify_nin(cls, nin):

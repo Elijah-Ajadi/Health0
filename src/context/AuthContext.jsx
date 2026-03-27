@@ -16,21 +16,19 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = async (username, password) => {
+    const login = async (email, password) => {
         try {
-            const res = await api.post('/login/', { username, password });
+            const res = await api.post('/login/', { username: email, password });
             const { token, user: userData } = res.data;
-            
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(userData));
             localStorage.setItem('role', userData.role);
-            
             setUser(userData);
             return { success: true };
         } catch (err) {
-            return { 
-                success: false, 
-                error: err.response?.data?.error || 'Invalid credentials' 
+            return {
+                success: false,
+                error: err.response?.data?.error || 'Invalid credentials',
             };
         }
     };

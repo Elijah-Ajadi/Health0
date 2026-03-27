@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../services/api'
+import { Button, Card, LoadingShimmer } from '../components/ui'
 
 const RecordDetail = () => {
     const navigate = useNavigate()
@@ -37,9 +38,15 @@ const RecordDetail = () => {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-sm font-bold text-on-surface-variant uppercase tracking-widest animate-pulse">Decrypting Clinical Data...</p>
+            <div className="space-y-10 pb-12">
+                <div className="flex items-center justify-between">
+                    <div className="space-y-4">
+                        <LoadingShimmer width="w-32" height="h-6" />
+                        <LoadingShimmer width="w-64" height="h-12" />
+                    </div>
+                </div>
+                <LoadingShimmer height="h-[400px]" rounded="rounded-[2.5rem]" />
+                <LoadingShimmer height="h-24" rounded="rounded-3xl" />
             </div>
         )
     }
@@ -57,13 +64,16 @@ const RecordDetail = () => {
                     </div>
                     <h1 className="text-4xl font-headline font-black text-on-surface tracking-tight italic uppercase">{record.category}</h1>
                 </div>
-                <button className="p-4 bg-surface-container-high rounded-2xl text-on-surface-variant hover:bg-primary hover:text-white transition-all shadow-subtle">
-                    <span className="material-symbols-outlined">share</span>
-                </button>
+                <Button 
+                    variant="surface" 
+                    icon="share" 
+                    size="icon" 
+                    className="p-6 rounded-2xl"
+                />
             </div>
 
             {/* ─── MAIN CONTENT CARD ─── */}
-            <div className="bg-surface-container-lowest rounded-[2.5rem] p-8 md:p-12 border border-outline-variant/10 shadow-subtle space-y-10">
+            <Card className="p-8 md:p-12 space-y-10">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8">
                     <div className="space-y-4 flex-1">
                         <div className="flex items-center gap-3">
@@ -85,27 +95,30 @@ const RecordDetail = () => {
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.2em] ml-1">Clinical Observations</h3>
-                    <div className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant/5 text-on-surface font-medium leading-relaxed italic text-lg shadow-inner">
-                        "{record.description}"
-                    </div>
+                <div className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant/10 text-on-surface font-medium leading-relaxed italic text-lg shadow-inner">
+                    "{record.description}"
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-4 pt-4">
-                    <button 
+                    <Button 
+                        variant="primary" 
+                        size="lg" 
+                        icon="local_shipping" 
+                        className="flex-1"
                         onClick={() => setShowDelivery(true)}
-                        className="flex-1 py-5 bg-primary text-white rounded-2xl font-headline font-black text-sm uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
                     >
-                        <span className="material-symbols-outlined">local_shipping</span>
                         Request Physical Copy
-                    </button>
-                    <button className="flex-1 py-5 border-2 border-outline-variant/20 text-on-surface-variant rounded-2xl font-headline font-black text-sm uppercase tracking-widest hover:border-primary/40 transition-all flex items-center justify-center gap-3">
-                        <span className="material-symbols-outlined">cloud_download</span>
+                    </Button>
+                    <Button 
+                        variant="surface" 
+                        size="lg" 
+                        icon="cloud_download" 
+                        className="flex-1"
+                    >
                         Export PDF
-                    </button>
+                    </Button>
                 </div>
-            </div>
+            </Card>
 
             {/* ─── BLOCKCHAIN PROOF ─── */}
             <div className="bg-surface-container-low rounded-3xl p-6 border border-outline-variant/10 flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
@@ -164,13 +177,15 @@ const RecordDetail = () => {
                                     </div>
 
                                     <div className="flex gap-4">
-                                        <button onClick={() => setShowDelivery(false)} className="flex-1 py-4 font-bold text-on-surface-variant hover:text-on-surface">Cancel</button>
-                                        <button 
+                                        <Button variant="ghost" className="flex-1" onClick={() => setShowDelivery(false)}>Cancel</Button>
+                                        <Button 
+                                            variant="primary" 
+                                            className="flex-[2]"
                                             onClick={() => setDeliverySent(true)}
-                                            className="flex-[2] py-4 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                                            icon="check_circle"
                                         >
                                             Confirm Request
-                                        </button>
+                                        </Button>
                                     </div>
                                 </>
                             ) : (
@@ -182,12 +197,13 @@ const RecordDetail = () => {
                                     <p className="text-on-surface-variant font-medium mb-10 leading-relaxed">
                                         Your request has been logged. Clinical verification is underway, and a tracking ID will be issued shortly.
                                     </p>
-                                    <button 
+                                    <Button 
+                                        variant="primary" 
+                                        className="w-full"
                                         onClick={() => setShowDelivery(false)}
-                                        className="w-full py-4 bg-on-surface text-surface rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all"
                                     >
                                         Close Portal
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                         </motion.div>

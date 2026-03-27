@@ -1,17 +1,23 @@
 import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
+import { Button, Input } from '../components/ui'
 
 const RecordUpload = () => {
     const navigate = useNavigate()
+    const { user } = useAuth()
     const [dragActive, setDragActive] = useState(false)
     const [file, setFile] = useState(null)
     const [loading, setLoading] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
+    const [error, setError] = useState('')
+    const [uploadProgress, setUploadProgress] = useState(0)
     const [formData, setFormData] = useState({
         patient_nin: '',
-        category: 'Radiology Report',
+        title: '',
+        record_type: 'DOCUMENT',
         description: ''
     })
 
@@ -29,18 +35,33 @@ const RecordUpload = () => {
     }
 
     const handleUpload = async () => {
+        if (!file) return
         setLoading(true)
-        const data = new FormData()
-        data.append('file', file)
-        data.append('patient_nin', formData.patient_nin)
-        data.append('category', formData.category)
-        data.append('description', formData.description)
+        setError('')
+        setUploadProgress(0)
 
         try {
-            await api.post('/records/upload/', data)
+            const data = new FormData()
+            data.append('file', file)
+            data.append('title', formData.title || file.name)
+            data.append('record_type', formData.record_type)
+            data.append('description', formData.description)
+
+            // If uploading for a specific patient (hospital role), include NIN
+            if (user?.role === 'HOSPITAL' && formData.patient_nin) {
+                data.append('patient_nin', formData.patient_nin)
+            }
+
+            await api.post('/records/', data, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress: (progressEvent) => {
+                    const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                    setUploadProgress(percent)
+                }
+            })
             setIsSuccess(true)
         } catch (err) {
-            console.error('Upload failed:', err)
+            setError(err.response?.data?.error || err.message || 'Upload failed. Please try again.')
         } finally {
             setLoading(false)
         }
@@ -49,7 +70,7 @@ const RecordUpload = () => {
     if (isSuccess) {
         return (
             <div className="flex items-center justify-center min-h-[70vh]">
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="max-w-md w-full text-center p-12 bg-surface-container-lowest rounded-[3rem] shadow-modal border border-outline-variant/10"
@@ -59,21 +80,15 @@ const RecordUpload = () => {
                     </div>
                     <h2 className="text-3xl font-headline font-black text-on-surface uppercase italic mb-4">Ledger Updated</h2>
                     <p className="text-on-surface-variant font-medium mb-12 leading-relaxed">
-                        The clinical record has been encrypted and securely synchronized with the patient's global health vault.
+                        The clinical record has been securely synchronized with the patient's health vault.
                     </p>
-                    <div className="space-y-3">
-                        <button 
-                            onClick={() => { setIsSuccess(false); setFile(null); }}
-                            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-all"
-                        >
+                    <div className="space-y-4">
+                        <Button variant="primary" size="lg" className="w-full" onClick={() => { setIsSuccess(false); setFile(null); setUploadProgress(0) }}>
                             Upload Another Record
-                        </button>
-                        <button 
-                            onClick={() => navigate('/dashboard')}
-                            className="w-full py-4 text-on-surface-variant font-bold text-sm hover:underline"
-                        >
+                        </Button>
+                        <Button variant="surface" className="w-full" onClick={() => navigate('/dashboard')}>
                             Return to Portal
-                        </button>
+                        </Button>
                     </div>
                 </motion.div>
             </div>
@@ -98,41 +113,58 @@ const RecordUpload = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                 {/* ─── FORM (LEFT) ─── */}
                 <div className="lg:col-span-7 space-y-8">
+                    {error && (
+                        <div className="p-4 bg-error-container border border-error/10 rounded-2xl flex items-center gap-3 text-error text-sm font-bold">
+                            <span className="material-symbols-outlined">error</span>
+                            {error}
+                        </div>
+                    )}
                     <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-subtle border border-outline-variant/10 space-y-6">
-                        <InputField 
-                            label="Target Patient NIN (11 Digits)" 
-                            placeholder="Search by identity number..." 
-                            value={formData.patient_nin}
-                            onChange={(e) => setFormData({...formData, patient_nin: e.target.value.replace(/\D/g, '').slice(0, 11)})}
+                        {/* Hospital uploads for a specific patient */}
+                        {user?.role === 'HOSPITAL' && (
+                            <Input
+                                label="Target Patient NIN (11 Digits)"
+                                icon="fingerprint"
+                                placeholder="Search by identity number..."
+                                value={formData.patient_nin}
+                                onChange={(e) => setFormData({...formData, patient_nin: e.target.value.replace(/\D/g, '').slice(0, 11)})}
+                            />
+                        )}
+                        <Input
+                            label="Record Title"
+                            icon="edit"
+                            placeholder="e.g. Blood Test Results — Jan 2025"
+                            value={formData.title}
+                            onChange={(e) => setFormData({...formData, title: e.target.value})}
                         />
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">Record Classification</label>
-                            <select 
-                                className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/40 outline-none transition-all"
-                                value={formData.category}
-                                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                            <select
+                                className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-2 border-transparent focus:border-primary/20 transition-all outline-none"
+                                value={formData.record_type}
+                                onChange={(e) => setFormData({...formData, record_type: e.target.value})}
                             >
-                                <option>Radiology Report</option>
-                                <option>Blood Analysis</option>
-                                <option>Surgery Summary</option>
-                                <option>Vaccination Record</option>
-                                <option>General Consultation</option>
+                                <option value="DOCUMENT">General Document</option>
+                                <option value="PDF">PDF Report</option>
+                                <option value="IMAGE">Medical Image</option>
                             </select>
                         </div>
-                        <InputField 
-                            label="Clinical Observations / Description" 
-                            placeholder="Enter detailed report summary..." 
-                            isTextArea 
-                            rows={4}
-                            value={formData.description}
-                            onChange={(e) => setFormData({...formData, description: e.target.value})}
-                        />
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">Clinical Observations</label>
+                            <textarea
+                                className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-2 border-transparent focus:border-primary/20 transition-all outline-none placeholder:text-on-surface-variant/40 resize-none"
+                                rows="4"
+                                placeholder="Enter detailed report summary..."
+                                value={formData.description}
+                                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* ─── DROPZONE (RIGHT) ─── */}
                 <div className="lg:col-span-5 space-y-6">
-                    <label 
+                    <label
                         onDragEnter={handleDrag}
                         onDragLeave={handleDrag}
                         onDragOver={handleDrag}
@@ -141,8 +173,8 @@ const RecordUpload = () => {
                             dragActive ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container-lowest hover:border-primary/40'
                         }`}
                     >
-                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => setFile(e.target.files[0])} />
-                        
+                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => setFile(e.target.files[0])} accept=".pdf,.jpg,.jpeg,.png,.dcm" />
+
                         {!file ? (
                             <>
                                 <div className="w-20 h-20 bg-primary/5 text-primary rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-inner">
@@ -150,7 +182,7 @@ const RecordUpload = () => {
                                 </div>
                                 <h3 className="text-lg font-black text-on-surface uppercase italic mb-2">Drop Clinical File</h3>
                                 <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
-                                    Drag and drop PDFs or medical images (DICOM, JPG) up to 50MB.
+                                    PDFs, medical images (JPG, PNG) up to 50MB.
                                 </p>
                             </>
                         ) : (
@@ -159,40 +191,42 @@ const RecordUpload = () => {
                                     <span className="material-symbols-outlined text-5xl">description</span>
                                 </div>
                                 <h3 className="text-lg font-black text-on-surface uppercase italic mb-1 break-all px-4">{file.name}</h3>
-                                <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-4">Ready for Encryption</p>
-                                <button onClick={(e) => { e.preventDefault(); setFile(null); }} className="text-error font-black text-[10px] uppercase tracking-widest hover:underline">Remove File</button>
+                                <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-4">
+                                    {(file.size / 1024 / 1024).toFixed(2)} MB — Ready
+                                </p>
+                                <button onClick={(e) => { e.preventDefault(); setFile(null) }} className="text-error font-black text-[10px] uppercase tracking-widest hover:underline">Remove File</button>
                             </>
                         )}
                     </label>
 
-                    <button 
+                    {/* Upload progress bar */}
+                    {loading && uploadProgress > 0 && (
+                        <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-primary rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress}%` }}
+                            />
+                        </div>
+                    )}
+
+                    <Button
+                        variant="primary"
+                        size="lg"
+                        className="w-full"
                         onClick={handleUpload}
-                        disabled={!file || !formData.patient_nin || loading}
-                        className={`w-full py-5 rounded-2xl font-headline font-black text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 ${
-                            file && formData.patient_nin && !loading ? 'bg-gradient-to-r from-primary to-primary-container shadow-primary/30' : 'bg-surface-dim text-on-surface-variant cursor-not-allowed'
-                        }`}
+                        disabled={!file || loading}
+                        icon={loading ? 'sync' : 'verified'}
+                        iconPosition="right"
                     >
-                        {loading ? 'Encrypting Node...' : 'Synchronize Record'}
-                        <span className="material-symbols-outlined">{loading ? 'sync' : 'verified'}</span>
-                    </button>
+                        {loading ? `Uploading ${uploadProgress}%...` : 'Synchronize Record'}
+                    </Button>
                     <p className="text-[10px] text-center text-on-surface-variant font-bold uppercase tracking-widest opacity-60">
-                        AES-256 Multi-layer Encryption Active
+                        Stored securely via Django Media Storage
                     </p>
                 </div>
             </div>
         </div>
     )
 }
-
-const InputField = ({ label, placeholder, value, onChange, type = "text", isTextArea = false, rows = "3" }) => (
-    <div className="space-y-2">
-        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">{label}</label>
-        {isTextArea ? (
-            <textarea className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-outline/40 resize-none outline-none" rows={rows} placeholder={placeholder} value={value} onChange={onChange} />
-        ) : (
-            <input type={type} className="w-full px-6 py-5 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/40 transition-all placeholder:text-outline/40 outline-none" placeholder={placeholder} value={value} onChange={onChange} />
-        )}
-    </div>
-)
 
 export default RecordUpload

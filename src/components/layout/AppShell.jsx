@@ -4,6 +4,8 @@ import MobileHeader from './MobileHeader'
 import MobileBottomNav from './MobileBottomNav'
 import Sidebar from './Sidebar'
 import { useAuth } from '../../context/AuthContext'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Card, Button } from '../ui'
 
 /**
  * AppShell - The primary layout wrapper for authenticated users.
@@ -11,6 +13,8 @@ import { useAuth } from '../../context/AuthContext'
  */
 const AppShell = ({ children }) => {
     const { user } = useAuth()
+    const location = useLocation()
+    const navigate = useNavigate()
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
 
     // Ensure we have a fallback role if context is still loading
@@ -25,7 +29,7 @@ const AppShell = ({ children }) => {
             <MobileHeader 
                 user={user} 
                 onOpenNotifications={() => setIsNotificationsOpen(true)}
-                onOpenProfile={() => {/* Navigate to profile or open menu */}}
+                onOpenProfile={() => navigate('/settings')}
             />
 
             {/* ─── MAIN CONTENT AREA ─── */}
@@ -62,18 +66,25 @@ const AppShell = ({ children }) => {
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '100%' }}
-                            className="fixed top-0 right-0 h-full w-4/5 max-w-sm bg-surface shadow-modal z-[70] lg:hidden p-6"
+                            className="fixed top-0 right-0 h-full w-4/5 max-w-sm bg-surface shadow-[-20px_0_60px_rgba(0,0,0,0.1)] z-[70] lg:hidden p-6 flex flex-col"
                         >
                             <div className="flex items-center justify-between mb-8">
-                                <h3 className="text-xl font-headline font-black text-on-surface">Notifications</h3>
-                                <button onClick={() => setIsNotificationsOpen(false)} className="material-symbols-outlined text-on-surface-variant">close</button>
+                                <h3 className="text-xl font-headline font-black text-on-surface italic uppercase tracking-tighter">Notifications</h3>
+                                <button onClick={() => setIsNotificationsOpen(false)} className="w-10 h-10 rounded-full hover:bg-surface-container flex items-center justify-center transition-colors">
+                                    <span className="material-symbols-outlined text-on-surface-variant">close</span>
+                                </button>
                             </div>
-                            <div className="space-y-4">
-                                <div className="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/10">
-                                    <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">System</p>
-                                    <p className="text-sm font-medium text-on-surface">Your health ID has been synchronized with the main node.</p>
-                                    <p className="text-[10px] text-on-surface-variant mt-2">2 minutes ago</p>
-                                </div>
+                            <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                <Card padding="p-4">
+                                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1">System Node</p>
+                                    <p className="text-sm font-medium text-on-surface leading-snug">Your health ID has been synchronized with the global clinical network.</p>
+                                    <p className="text-[10px] text-on-surface-variant mt-2 font-bold">2m ago</p>
+                                </Card>
+                            </div>
+                            <div className="pt-6 border-t border-outline-variant/10">
+                                <Button variant="surface" size="sm" className="w-full" onClick={() => setIsNotificationsOpen(false)}>
+                                    Dismiss All
+                                </Button>
                             </div>
                         </motion.div>
                     </>

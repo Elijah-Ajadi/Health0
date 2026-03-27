@@ -2,7 +2,10 @@ const CACHE_NAME = 'health0-v1';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/logo_initial.png'
+  '/manifest.json',
+  '/logo_initial.png',
+  '/logo192.png',
+  '/logo512.png'
 ];
 
 self.addEventListener('install', event => {

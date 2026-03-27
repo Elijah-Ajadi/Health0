@@ -5,6 +5,7 @@ import {
     UserSearch, Activity, Globe, FileText, ArrowRight, CheckCircle2,
     Mail, Smartphone, Truck, Zap, Download, RefreshCw, Lock
 } from 'lucide-react'
+import { Button, Card } from '../components/ui'
 
 const LandingPage = () => {
     const navigate = useNavigate()
@@ -25,8 +26,17 @@ const LandingPage = () => {
                     <div className="flex items-center gap-12">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
                            <img src="/logo_initial.png" alt="Health0 Logo" className="w-10 h-10 rounded-xl" />
-                           <span className="text-xl font-black text-primary">Health0</span>
+                           <span className="text-xl font-black text-primary italic uppercase">Health0</span>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <Button 
+                            variant="primary" 
+                            size="sm" 
+                            onClick={() => navigate('/login')}
+                        >
+                            Login Portal
+                        </Button>
                     </div>
                 </div>
             </nav>
@@ -34,22 +44,17 @@ const LandingPage = () => {
             {/* Mobile Navigation Bar */}
             <header className="md:hidden bg-white/85 backdrop-blur-md shadow-[0_4px_20px_rgba(0,64,161,0.04)] sticky top-0 z-50 flex justify-between items-center px-6 h-16 w-full">
                 <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                        <ShieldCheck className="text-white w-5 h-5" />
-                    </div>
-                    <h1 className="text-blue-800 font-extrabold tracking-tighter font-headline text-xl">Health0</h1>
+                    <img src="/logo_initial.png" alt="Health0 Logo" className="w-8 h-8 rounded-lg shadow-sm" />
+                    <h1 className="text-primary font-black tracking-tighter font-headline text-xl italic uppercase">Health0</h1>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button className="p-2 rounded-full hover:bg-slate-100/50 transition-colors scale-95 active:scale-90">
-                        <Bell className="text-slate-500 w-5 h-5" />
-                    </button>
-                    <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center overflow-hidden">
-                        <img 
-                            alt="User Profile Avatar" 
-                            className="w-full h-full object-cover" 
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1CG4trg2VUgwDIXtuMvySZUYof654XPXY9ah9ReVMUgG4Te5MHzKE49hPdS8lO8sJUPlvAcP-8EDJDn-RfK-gFsPJBU7m5wz8vrQxYt2rF3bLpxvL1vMDrSSOHqp8Zh8xOi2PjkncxMLFg9_8qBWFKH5_YaU-8O68EOlJJ5_3UzklWUuRPQ1MStuS1RrAJxM-ZQ5JzWMQ-SVMWcca6AWGOFzT0rxbWq8MpckNKuo7gyRFrUZIiLO1PUIVKHjD7iCf0E088byK5Hk"
-                        />
-                    </div>
+                    <Button 
+                        variant="surface" 
+                        size="sm" 
+                        onClick={() => navigate('/login')}
+                    >
+                        Login
+                    </Button>
                 </div>
             </header>
 
@@ -91,18 +96,22 @@ const LandingPage = () => {
                             <Pillar icon={Shield} title="Sovereign Data" description="Patient-owned encrypted vaults with immutable logs." />
                         </div>
                         <div className="flex flex-wrap gap-4 pt-8">
-                            <button 
-                                className="bg-primary signature-gradient text-white px-8 py-4 rounded-xl font-semibold shadow-lg shadow-primary/20 hover:opacity-90 transition-all active:scale-95"
+                            <Button 
+                                variant="primary" 
+                                size="lg" 
+                                icon="person_add"
                                 onClick={() => handleLogin('patient')}
                             >
                                 Create Patient Vault
-                            </button>
-                            <button 
-                                className="bg-surface-container-high text-on-surface px-8 py-4 rounded-xl font-semibold hover:bg-surface-container-highest transition-all"
+                            </Button>
+                            <Button 
+                                variant="surface" 
+                                size="lg" 
+                                icon="account_balance"
                                 onClick={() => handleLogin('hospital')}
                             >
                                 Onboard Your Hospital
-                            </button>
+                            </Button>
                         </div>
                     </motion.div>
 

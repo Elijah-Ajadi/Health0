@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import api from '../services/api'
+import { Card, Button, LoadingShimmer, EmptyState } from '../components/ui'
 
 const AdminDashboard = () => {
     const { logout } = useAuth()
@@ -45,9 +46,25 @@ const AdminDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-primary/10"></div>
-                <p className="text-sm font-bold text-on-surface-variant uppercase tracking-widest animate-pulse">Initializing Root Authority...</p>
+            <div className="space-y-8 lg:space-y-12">
+                <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div className="space-y-4">
+                        <LoadingShimmer width="w-32" height="h-6" />
+                        <LoadingShimmer width="w-64" height="h-12" />
+                    </div>
+                </section>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map(i => <LoadingShimmer key={i} height="h-32" rounded="rounded-[2.5rem]" />)}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+                    <div className="lg:col-span-8 space-y-6">
+                        <LoadingShimmer height="h-48" rounded="rounded-[2rem]" />
+                        <LoadingShimmer height="h-48" rounded="rounded-[2rem]" />
+                    </div>
+                    <div className="lg:col-span-4 space-y-6">
+                        <LoadingShimmer height="h-96" rounded="rounded-[2.5rem]" />
+                    </div>
+                </div>
             </div>
         )
     }
@@ -73,23 +90,17 @@ const AdminDashboard = () => {
                     </h1>
                 </div>
                 <div className="flex gap-3">
-                    <button className="flex-1 md:flex-initial px-8 py-4 bg-on-surface text-surface rounded-2xl font-bold text-sm shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2">
-                        <span className="material-symbols-outlined text-xl">terminal</span>
-                        System Logs
-                    </button>
-                    <button className="flex-1 md:flex-initial px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                        <span className="material-symbols-outlined text-xl">shield_person</span>
-                        Audit Users
-                    </button>
+                    <Button variant="surface" icon="terminal" className="flex-1 md:flex-initial">System Logs</Button>
+                    <Button variant="primary" icon="shield_person" className="flex-1 md:flex-initial">Audit Users</Button>
                 </div>
             </section>
 
             {/* ─── GLOBAL METRICS ─── */}
             <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <AdminStatCard icon="hub" value={stats?.total_patients} label="Total Identities" color="primary" trend="+4.2k" />
-                <AdminStatCard icon="account_balance" value={stats?.active_hospitals} label="Active Providers" color="emerald" trend="+12" />
-                <AdminStatCard icon="verified_user" value={stats?.pending_verifications} label="Vetting Queue" color="amber" trend="Priority" />
-                <AdminStatCard icon="analytics" value={stats?.clinical_records} label="Indexed Records" color="blue" trend="+240k" />
+                <Card icon="hub" title={stats?.total_patients} subtitle="Total Identities" />
+                <Card icon="account_balance" title={stats?.active_hospitals} subtitle="Active Providers" />
+                <Card icon="verified_user" title={stats?.pending_verifications} subtitle="Vetting Queue" />
+                <Card icon="analytics" title={stats?.clinical_records} subtitle="Indexed Records" />
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -138,32 +149,43 @@ const AdminDashboard = () => {
                                         <div className="flex items-center gap-2">
                                             {hosp.status === 'PENDING' ? (
                                                 <>
-                                                    <button 
+                                                    <Button 
+                                                        variant="primary" 
+                                                        size="sm" 
+                                                        icon="domain_verification"
                                                         onClick={() => handleVerify(hosp.id, 'VERIFIED')}
-                                                        className="px-6 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest italic shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                                                        className="italic"
                                                     >
                                                         Activate Provision
-                                                    </button>
-                                                    <button className="p-4 bg-surface-container-high text-error rounded-2xl hover:bg-error hover:text-white transition-all">
-                                                        <span className="material-symbols-outlined text-xl">block</span>
-                                                    </button>
+                                                    </Button>
+                                                    <Button 
+                                                        variant="surface" 
+                                                        size="icon" 
+                                                        icon="block" 
+                                                        className="text-error"
+                                                    />
                                                 </>
                                             ) : (
-                                                <button className="bg-surface-container-high text-on-surface-variant px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest italic flex items-center gap-2 hover:bg-on-surface hover:text-surface transition-all">
-                                                    <span className="material-symbols-outlined text-[18px]">history</span> Audit Trail
-                                                </button>
+                                                <Button 
+                                                    variant="surface" 
+                                                    size="sm" 
+                                                    icon="history"
+                                                    className="italic"
+                                                >
+                                                    Audit Trail
+                                                </Button>
                                             )}
                                         </div>
                                     </div>
                                 </motion.div>
                             )) : (
-                                <div className="text-center py-24 bg-surface-container-low border-2 border-dashed border-outline-variant/20 rounded-[3rem] flex flex-col items-center gap-4">
-                                    <span className="material-symbols-outlined text-6xl text-outline-variant">playlist_add_check</span>
-                                    <div>
-                                        <p className="text-on-surface font-black uppercase tracking-tight text-lg italic">Verification Queue Clear</p>
-                                        <p className="text-on-surface-variant text-sm mt-1">All provider nodes are currently synchronized and verified.</p>
-                                    </div>
-                                </div>
+                                <EmptyState 
+                                    icon="playlist_add_check"
+                                    title="Queue Clear"
+                                    message="All provider nodes are currently synchronized and verified."
+                                    actionLabel="Network Refresh"
+                                    onAction={fetchAdminData}
+                                />
                             )}
                         </AnimatePresence>
                     </div>
@@ -202,34 +224,13 @@ const AdminDashboard = () => {
                             <EventLog label="St. Jude Facility verified" time="4m ago" type="success" />
                             <EventLog label="New identity node registered" time="12m ago" type="info" />
                         </div>
-                        <button className="w-full py-4 border-2 border-outline-variant/10 rounded-2xl text-on-surface-variant font-bold text-[10px] uppercase tracking-widest hover:border-primary/20 transition-all">Export Root Logs</button>
+                        <Button variant="outline" size="sm" className="w-full mt-4 italic">Export Root Logs</Button>
                     </div>
                 </aside>
             </div>
         </div>
     )
 }
-
-const AdminStatCard = ({ icon, value, label, color, trend }) => (
-    <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-outline-variant/10 shadow-subtle transition-all group overflow-hidden relative">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 shadow-inner ${
-            color === 'primary' ? 'bg-primary/5 text-primary' :
-            color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
-            color === 'amber' ? 'bg-amber-50 text-amber-600' :
-            'bg-blue-50 text-blue-600'
-        }`}>
-            <span className="material-symbols-outlined text-3xl group-hover:scale-110 transition-transform">{icon}</span>
-        </div>
-        <div className="text-4xl font-headline font-black text-on-surface leading-none mb-2">{value}</div>
-        <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-6">{label}</p>
-        <div className={`text-[9px] font-black px-3 py-1 rounded-full w-fit uppercase tracking-widest ${
-            color === 'primary' ? 'bg-primary/10 text-primary' :
-            color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
-            color === 'amber' ? 'bg-amber-100 text-amber-700' :
-            'bg-blue-100 text-blue-700'
-        }`}>{trend}</div>
-    </div>
-)
 
 const TopologyItem = ({ label, status, active }) => (
     <div className="flex items-center gap-4">

@@ -12,6 +12,7 @@ import {
     EyeOff,
     AlertCircle
 } from 'lucide-react';
+import { Button, Card, Input } from '../components/ui';
 
 const Login = () => {
     const { login } = useAuth();
@@ -77,19 +78,14 @@ const Login = () => {
                         )}
 
                         <form className="space-y-6" onSubmit={handleSubmit}>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em] ml-1">Identifier</label>
-                                <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 transition-colors group-focus-within:text-primary pointer-events-none" size={20} />
-                                    <input 
-                                        className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary rounded-2xl pl-12 pr-4 py-4 focus:ring-4 focus:ring-primary/5 transition-all outline-none font-medium placeholder:text-slate-300" 
-                                        placeholder="Username, Email or NIN" 
-                                        required
-                                        value={identifier}
-                                        onChange={(e) => setIdentifier(e.target.value)}
-                                    />
-                                </div>
-                            </div>
+                            <Input 
+                                label="Identifier"
+                                icon="person"
+                                placeholder="Username, Email or NIN"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                required
+                            />
 
                             <div className="space-y-2">
                                 <div className="flex justify-between items-end mb-1">
@@ -97,10 +93,10 @@ const Login = () => {
                                     <Link to="#" className="text-[10px] font-bold text-primary uppercase tracking-wider hover:underline underline-offset-4">Forgot?</Link>
                                 </div>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 transition-colors group-focus-within:text-primary pointer-events-none" size={20} />
+                                    <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline/40 group-focus-within:text-primary transition-colors">lock</span>
                                     <input 
                                         type={showPassword ? "text" : "password"}
-                                        className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary rounded-2xl pl-12 pr-12 py-4 focus:ring-4 focus:ring-primary/5 transition-all outline-none font-medium placeholder:text-slate-300" 
+                                        className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/20 rounded-2xl pl-16 pr-12 py-4 focus:ring-4 focus:ring-primary/5 transition-all outline-none font-bold text-on-surface placeholder:text-on-surface-variant/40" 
                                         placeholder="••••••••••••" 
                                         required
                                         value={password}
@@ -111,19 +107,21 @@ const Login = () => {
                                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-primary transition-colors focus:outline-none"
                                         onClick={() => setShowPassword(!showPassword)}
                                     >
-                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                        <span className="material-symbols-outlined">{showPassword ? 'visibility_off' : 'visibility'}</span>
                                     </button>
                                 </div>
                             </div>
 
-                            <button 
-                                className={`w-full flex items-center justify-center gap-2 py-5 bg-primary text-white font-headline font-extrabold text-lg rounded-2xl active:scale-95 transition-all shadow-xl shadow-primary/25 hover:shadow-primary/40 group ${(loading || !identifier || !password) ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                            <Button 
+                                variant="primary" 
+                                size="lg" 
+                                icon="login" 
+                                className="w-full"
                                 type="submit"
                                 disabled={loading || !identifier || !password}
                             >
                                 {loading ? 'Authorizing...' : 'Sign In'}
-                                {!loading && <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
-                            </button>
+                            </Button>
                         </form>
 
                         <div className="mt-10 text-center space-y-4">

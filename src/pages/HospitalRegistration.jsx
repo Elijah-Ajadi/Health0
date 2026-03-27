@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import RegistrationShell from '../components/layout/RegistrationShell'
+import { Button, Card, Input } from '../components/ui'
 
 const HospitalRegistration = () => {
     const navigate = useNavigate()
@@ -123,14 +124,17 @@ const HospitalRegistration = () => {
             desktopSidebar={renderDesktopSidebar}
             footer={
                 <div className="space-y-4">
-                    <button 
+                    <Button 
+                        variant="primary" 
+                        size="lg" 
+                        className="w-full"
                         onClick={nextStage}
                         disabled={!isStageValid() || loading}
-                        className={`w-full py-5 rounded-full font-headline font-bold text-white shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${isStageValid() ? 'bg-gradient-to-r from-primary to-primary-container shadow-primary/20' : 'bg-surface-dim text-on-surface-variant cursor-not-allowed'}`}
+                        icon={stage === 4 ? "check_circle" : "arrow_forward"}
+                        iconPosition="right"
                     >
                         {loading ? "Establishing Node..." : stage === 4 ? "Complete Onboarding" : "Continue"}
-                        <span className="material-symbols-outlined">{stage === 4 ? "check_circle" : "arrow_forward"}</span>
-                    </button>
+                    </Button>
                     {stage === 2 && (
                         <button onClick={() => setStage(3)} className="w-full py-2 text-on-surface-variant text-sm font-bold text-center">
                             Skip for now
@@ -157,19 +161,20 @@ const HospitalRegistration = () => {
                     {/* Stage 1: Facility Info */}
                     {stage === 1 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-surface-container-lowest p-6 md:p-10 rounded-3xl shadow-subtle border border-outline-variant/10">
-                            <InputField label="Hospital Name" placeholder="St. Jude Medical Center" value={formData.hospital_name} onChange={(e) => setFormData({...formData, hospital_name: e.target.value})} />
+                            <Input label="Hospital Name" placeholder="St. Jude Medical Center" icon="account_balance" value={formData.hospital_name} onChange={(e) => setFormData({...formData, hospital_name: e.target.value})} />
                             <div className="space-y-2">
                                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">Category</label>
-                                <select className="w-full px-5 py-4 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/30 transition-all outline-none" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}>
+                                <select className="w-full px-5 py-4 rounded-2xl bg-surface-container-low text-on-surface font-bold border-2 border-transparent focus:border-primary/20 transition-all outline-none" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}>
                                     <option>Private Enterprise</option>
                                     <option>Public Institution</option>
                                     <option>Non-Profit Foundation</option>
                                 </select>
                             </div>
-                            <InputField label="CAC Number" placeholder="RC-XXXXXX" value={formData.cac_number} onChange={(e) => setFormData({...formData, cac_number: e.target.value})} />
-                            <InputField label="TIN (Tax ID)" placeholder="XXXXXX-XXXX" value={formData.tin} onChange={(e) => setFormData({...formData, tin: e.target.value})} />
-                            <div className="md:col-span-2">
-                                <InputField label="Official Address" placeholder="Full institutional address..." rows="3" isTextArea value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
+                            <Input label="CAC Number" placeholder="RC-XXXXXX" icon="assignment" value={formData.cac_number} onChange={(e) => setFormData({...formData, cac_number: e.target.value})} />
+                            <Input label="TIN (Tax ID)" placeholder="XXXXXX-XXXX" icon="payments" value={formData.tin} onChange={(e) => setFormData({...formData, tin: e.target.value})} />
+                            <div className="md:col-span-2 space-y-2">
+                                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">Official Address</label>
+                                <textarea className="w-full px-6 py-4 rounded-2xl bg-surface-container-low text-on-surface font-bold border-2 border-transparent focus:border-primary/20 transition-all outline-none placeholder:text-on-surface-variant/40 resize-none" rows="3" placeholder="Full institutional address..." value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
                             </div>
                         </div>
                     )}
@@ -197,13 +202,13 @@ const HospitalRegistration = () => {
                     {stage === 3 && (
                         <div className="bg-surface-container-lowest p-8 md:p-10 rounded-3xl shadow-subtle border border-outline-variant/10 space-y-6">
                             <div className="grid md:grid-cols-2 gap-6">
-                                <InputField label="Admin Contact Name" placeholder="John Administrator" value={formData.admin_name} onChange={(e) => setFormData({...formData, admin_name: e.target.value})} />
-                                <InputField label="Official Work Phone" placeholder="+234 800 000 0000" value={formData.admin_phone} onChange={(e) => setFormData({...formData, admin_phone: e.target.value})} />
+                                <Input label="Admin Contact Name" placeholder="John Administrator" icon="person" value={formData.admin_name} onChange={(e) => setFormData({...formData, admin_name: e.target.value})} />
+                                <Input label="Official Work Phone" placeholder="+234 800 000 0000" icon="call" value={formData.admin_phone} onChange={(e) => setFormData({...formData, admin_phone: e.target.value})} />
                             </div>
-                            <InputField label="Institutional Email" type="email" placeholder="admin@stjude.org" value={formData.admin_email} onChange={(e) => setFormData({...formData, admin_email: e.target.value})} />
+                            <Input label="Institutional Email" type="email" placeholder="admin@stjude.org" icon="mail" value={formData.admin_email} onChange={(e) => setFormData({...formData, admin_email: e.target.value})} />
                             <div className="grid md:grid-cols-2 gap-6 pt-6 border-t border-outline-variant/10">
-                                <InputField label="Preferred Username" placeholder="stjude_admin" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} />
-                                <InputField label="Access Password" type="password" placeholder="••••••••••••" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                                <Input label="Preferred Username" placeholder="stjude_admin" icon="badge" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} />
+                                <Input label="Access Password" type="password" placeholder="••••••••••••" icon="lock" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
                             </div>
                         </div>
                     )}
@@ -220,18 +225,25 @@ const HospitalRegistration = () => {
 
                     {/* Desktop Footer (lg:flex) */}
                     <div className="hidden lg:flex items-center justify-between pt-10 border-t border-outline-variant/15">
-                        <button onClick={() => setStage(prev => prev - 1)} disabled={stage === 1} className={`text-on-surface-variant font-bold hover:text-primary transition-colors flex items-center gap-2 ${stage === 1 ? 'opacity-0 pointer-events-none' : ''}`}>
-                            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                        <Button 
+                            variant="surface"
+                            onClick={() => setStage(prev => prev - 1)} 
+                            disabled={stage === 1} 
+                            icon="arrow_back"
+                            className={stage === 1 ? 'opacity-0 pointer-events-none' : ''}
+                        >
                             Back
-                        </button>
-                        <button 
+                        </Button>
+                        <Button 
+                            variant="primary"
+                            size="lg"
                             onClick={nextStage}
                             disabled={!isStageValid() || loading}
-                            className={`px-12 py-5 rounded-full font-headline font-bold text-white shadow-xl active:scale-95 transition-all flex items-center gap-3 ${isStageValid() ? 'bg-gradient-to-r from-primary to-primary-container shadow-primary/25' : 'bg-surface-dim text-on-surface-variant cursor-not-allowed'}`}
+                            icon={stage === 4 ? "check_circle" : "arrow_forward"}
+                            iconPosition="right"
                         >
                             {loading ? "Establishing Node..." : stage === 4 ? "Complete Onboarding" : "Continue"}
-                            <span className="material-symbols-outlined text-[20px]">{stage === 4 ? "check_circle" : "arrow_forward"}</span>
-                        </button>
+                        </Button>
                     </div>
                 </motion.div>
             </AnimatePresence>
@@ -239,16 +251,7 @@ const HospitalRegistration = () => {
     )
 }
 
-const InputField = ({ label, placeholder, value, onChange, type = "text", isTextArea = false, rows = "3" }) => (
-    <div className="space-y-2">
-        <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest ml-1">{label}</label>
-        {isTextArea ? (
-            <textarea className="w-full px-5 py-4 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/30 transition-all placeholder:text-outline/50 resize-none outline-none" rows={rows} placeholder={placeholder} value={value} onChange={onChange} />
-        ) : (
-            <input type={type} className="w-full px-5 py-4 rounded-2xl bg-surface-container-low text-on-surface font-bold border-none ring-1 ring-outline-variant/20 focus:ring-2 focus:ring-primary/30 transition-all placeholder:text-outline/50 outline-none" placeholder={placeholder} value={value} onChange={onChange} />
-        )}
-    </div>
-)
+
 
 const FileUploadField = ({ label, onChange, file }) => (
     <div className="space-y-3">

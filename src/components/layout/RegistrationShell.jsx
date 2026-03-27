@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 
 /**
  * RegistrationShell - Unified wrapper for multi-stage registration flows.
@@ -19,6 +20,7 @@ const RegistrationShell = ({
     footer,
     desktopSidebar 
 }) => {
+    const navigate = useNavigate()
     const progress = (stage / totalStages) * 100
 
     return (
@@ -43,8 +45,8 @@ const RegistrationShell = ({
                             </h1>
                         </div>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary">
-                        <span className="material-symbols-outlined text-[18px]">medical_services</span>
+                    <div onClick={() => navigate('/')} className="cursor-pointer">
+                        <img src="/logo_initial.png" alt="Health0 Logo" className="w-8 h-8 rounded-lg shadow-sm" />
                     </div>
                 </div>
                 {/* Progress Bar */}
