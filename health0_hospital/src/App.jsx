@@ -70,7 +70,7 @@ const App = () => {
         });
 
         try {
-            const res = await axios.post('http://localhost:8000/api/hospital/signup/', data);
+            const res = await axios.post('https://health0.onrender.com/api/hospital/signup/', data);
             setSuccess(true);
         } catch (err) {
             setError(err.response?.data?.error || 'Signup failed. Please check your data.');
